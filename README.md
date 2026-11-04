@@ -12,7 +12,7 @@ It is a single VBA module. You don't install an add-in and it doesn't need a net
 - **End alert:** the macOS *Hero* sound plays three times at zero, at your system alert volume. You can turn it off per timer.
 - **Durations from 1 second to 23:59:59.** An hours field appears automatically for timers of one hour or more.
 - **One timer per slide.** Each slide stores its own duration and sound setting.
-- **Releases the slide show when finished.** After the countdown and alert, the macro stops, so you can move to the next slide normally.
+- **Gets out of your way.** The macro only runs while the countdown is running. Pause it, or let it finish, and Esc and slide navigation work normally again. Play resumes where you paused.
 - **Offline and self-contained:** no telemetry, network calls, AppleScript or third-party code.
 
 ## Requirements
@@ -43,11 +43,13 @@ When PowerPoint asks about macros on opening the file, enable them. Without macr
 
 | Control | What it does |
 | --- | --- |
-| **Play/pause** (or click the digits) | Start, pause or resume. After TIME'S UP it starts a new countdown. |
+| **Play/pause** (or click the digits) | Start, pause or resume. Pausing also releases the show for Esc and navigation. After TIME'S UP it starts a new countdown. |
 | **SET** | Step to the next preset: 1, 2, 3, 5, 10, 15, 20, 30, 45, 60 minutes, then back to 1. Resets the timer. |
 | **+** / **−** | Add or subtract one minute. Works while running or paused, with a minimum of 1 second. |
 | **RESET** | Restore the configured duration and wait for play. |
 | **SOUND ON / OFF** | Turn the end alert on or off for this timer. |
+
+**Need to leave mid-countdown?** Press pause, then Esc or the arrow keys as usual.
 
 At zero the digits turn muted red, the display shows **00:00 / TIME'S UP**, and the alert plays (if sound is on). Clicking reset, play or SOUND OFF during the alert stops the remaining repeats.
 
@@ -109,9 +111,10 @@ The SET presets are in `NextPresetDuration`. If the sound file can't be loaded, 
 
 ## Known limitations
 
-- Leaving the slide or ending the show while the timer runs resets it. The countdown doesn't follow you across slides.
-- After the timer finishes, TIME'S UP stays on the slide until you press play or reset, including when you come back to that slide later.
-- While a countdown is running, the VBA loop is active, and PowerPoint may react to keyboard navigation more slowly than usual.
+- Leaving the slide or ending the show while the timer *runs* resets it. The countdown doesn't follow you across slides.
+- A paused or finished timer keeps its display (PAUSED or TIME'S UP), also when you come back to the slide or end the show. Press RESET to return to the configured duration. Because PowerPoint keeps shape changes made during a show, save the file after a reset if you want it to open in the Ready state.
+- While a countdown is running, the VBA loop is active, and PowerPoint may react to keyboard navigation more slowly than usual. Pause first for instant navigation.
+- PowerPoint for Mac offers VBA no way to add keyboard shortcuts inside a slide show, so pause is the way to release the timer.
 - Only one slide show at a time and one timer per slide are supported.
 - Don't let the Mac sleep during a countdown.
 
@@ -137,6 +140,7 @@ Exit the slide show. In the Visual Basic Editor, remove the old **SlideTimer** m
 
 ## Changelog
 
+- **1.1.9:** Pausing ends the macro, so Esc and navigation work while paused. Play resumes the remaining time, and +/− adjust it.
 - **1.1.8:** SET steps through presets during the show (the dialog was unreachable). The macro releases the slide show after the finish alert, and the redraw no longer pulls you back after you navigate away.
 - **1.1.7:** The end alert is the macOS Hero sound, played three times.
 - **1.1.6:** The end alert plays through macOS AudioToolbox instead of the silent VBA `Beep`.

@@ -1,6 +1,6 @@
 Option Explicit
 
-' Slide Timer 1.1.8 | PowerPoint for Mac, VBA7 / 64-bit
+' Slide Timer 1.1.9 | PowerPoint for Mac, VBA7 / 64-bit
 ' Import this module into a presentation and save the presentation as .pptm.
 ' Run Timer_Insert in Normal view. Click play/pause in Slide Show view.
 ' No network, AppleScript, ActiveX, or third-party dependencies at runtime.
@@ -35,7 +35,7 @@ Option Explicit
 Private Const PT_MARKER As String = "PT_TIMER"
 Private Const PT_SECONDS As String = "PT_SECONDS"
 Private Const PT_SOUND As String = "PT_SOUND"
-Private Const PT_VERSION As String = "1.1.8"
+Private Const PT_VERSION As String = "1.1.9"
 Private Const PT_MAX_SECONDS As Long = 86399
 Private Const PT_ALERT_FILE As String = "/System/Library/Sounds/Hero.aiff"
 Private Const PT_ALERT_REPEATS As Long = 3
@@ -52,6 +52,8 @@ Private mTimer As Shape
 Private mSlide As Slide
 Private mWindow As SlideShowWindow
 Private mAlertSound As Long
+Private mPausedTimer As Shape
+Private mPausedRemaining As Double
 Private mAlertsLeft As Long
 Private mNextAlert As Double
 
@@ -120,6 +122,7 @@ Public Sub Timer_Configure()
     End If
     If accepted Then
         timer.Tags.Add PT_SECONDS, CStr(duration)
+        If IsPausedTimer(timer) Then ClearPaused
         If active Then
             mRemaining = duration
             mRunning = False
@@ -183,7 +186,9 @@ Public Sub Timer_Toggle()
     Set mWindow = win
     Set mSlide = win.View.Slide
     mRemaining = DurationOf(timer)
-    PaintTimer timer, CLng(mRemaining), "Ready"
+    If IsPausedTimer(timer) Then mRemaining = mPausedRemaining
+    ClearPaused
+    PaintTimer timer, WholeSeconds(mRemaining), "Ready"
     mDeadline = ClockSeconds() + mRemaining
     mFinished = False
     mRunning = True
@@ -209,6 +214,7 @@ Public Sub Timer_Reset()
         mFinished = False
         mRemaining = DurationOf(timer)
     End If
+    If IsPausedTimer(timer) Then ClearPaused
     PaintTimer timer, DurationOf(timer), "Ready"
     Exit Sub
 Failed:
@@ -264,6 +270,12 @@ Private Sub AdjustDuration(ByVal change As Long)
         If mRunning Then mDeadline = ClockSeconds() + mRemaining
         timer.Tags.Add PT_SECONDS, CStr(newDuration)
         PaintActiveTimer
+    ElseIf IsPausedTimer(timer) Then
+        mPausedRemaining = mPausedRemaining + actualChange
+        If mPausedRemaining < 1 Then mPausedRemaining = 1
+        If mPausedRemaining > PT_MAX_SECONDS Then mPausedRemaining = PT_MAX_SECONDS
+        timer.Tags.Add PT_SECONDS, CStr(newDuration)
+        PaintTimer timer, WholeSeconds(mPausedRemaining), "Paused"
     Else
         timer.Tags.Add PT_SECONDS, CStr(newDuration)
         PaintTimer timer, newDuration, "Ready"
@@ -340,7 +352,8 @@ Public Sub Timer_Help()
         "Reset: restore the duration and wait for play/pause." & vbCrLf & _
         "SET: next preset (1-60 min). Plus/minus: adjust one minute." & vbCrLf & _
         "Sound: enable or mute the end alert." & vbCrLf & vbCrLf & _
-        "Leaving the slide or ending the show resets the timer." & vbCrLf & _
+        "Pause releases the show: Esc and slide navigation work normally." & vbCrLf & _
+        "Leaving the slide while it runs resets the timer." & vbCrLf & _
         "Save as .pptm to keep the code. Import this module into each deck.", _
         vbInformation, "Slide Timer"
 End Sub
@@ -348,7 +361,7 @@ End Sub
 ' ------------ Timer engine ------------
 
 Private Sub RunTimerLoop()
-    Dim problem As String, nextVisibilityCheck As Double, finished As Boolean
+    Dim problem As String, nextVisibilityCheck As Double, idle As Boolean
     On Error GoTo Failed
     Do While mLoopActive
         DoEvents
@@ -365,16 +378,17 @@ Private Sub RunTimerLoop()
             End If
         End If
         If mAlertsLeft > 0 Then ContinueAlert
-        ' A running macro holds up slide navigation. Once the countdown and
-        ' its alert are done, end the loop and leave the slide to PowerPoint.
-        If mFinished And mAlertsLeft = 0 And Not mConfiguring Then
-            finished = True
+        ' A running macro holds up slide navigation and Esc. Whenever the
+        ' countdown is not running (paused, reset or finished) and no alert is
+        ' pending, end the loop and leave the slide to PowerPoint.
+        If Not mRunning And mAlertsLeft = 0 And Not mConfiguring Then
+            idle = True
             Exit Do
         End If
         YieldBriefly
     Loop
-    If finished Then
-        EndFinishedSession
+    If idle Then
+        EndIdleSession
     Else
         StopTimerSession
     End If
@@ -408,6 +422,7 @@ Private Sub StopTimerSession()
     mFinished = False
     mAlertsLeft = 0
     mConfiguring = False
+    ClearPaused
     On Error Resume Next
     If Not mTimer Is Nothing Then PaintTimer mTimer, DurationOf(mTimer), "Ready"
     Set mTimer = Nothing
@@ -416,9 +431,16 @@ Private Sub StopTimerSession()
     On Error GoTo 0
 End Sub
 
-Private Sub EndFinishedSession()
-    ' Like StopTimerSession, but keep "Time's up" on the display. The next
-    ' play/pause click starts a new countdown from the configured duration.
+Private Sub EndIdleSession()
+    ' Like StopTimerSession, but keep the display as it is. A paused time is
+    ' remembered so the next play/pause click resumes it; after "Time's up"
+    ' or a reset, the next click starts from the configured duration.
+    If Not mFinished And mRemaining > 0 And WholeSeconds(mRemaining) < DurationOf(mTimer) Then
+        Set mPausedTimer = mTimer
+        mPausedRemaining = mRemaining
+    Else
+        ClearPaused
+    End If
     mRunning = False
     mLoopActive = False
     mFinished = False
@@ -512,6 +534,18 @@ Done:
     If AlertSoundID = 0 Then AlertSoundID = &H1000
 End Function
 #End If
+
+Private Function IsPausedTimer(ByVal timer As Shape) As Boolean
+    On Error GoTo Different
+    If mPausedTimer Is Nothing Or timer Is Nothing Then Exit Function
+    If timer Is mPausedTimer Then IsPausedTimer = True
+Different:
+End Function
+
+Private Sub ClearPaused()
+    Set mPausedTimer = Nothing
+    mPausedRemaining = 0
+End Sub
 
 Private Function IsActiveTimer(ByVal timer As Shape) As Boolean
     On Error GoTo Different
