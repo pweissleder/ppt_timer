@@ -1,0 +1,216 @@
+<!doctype html>
+<html lang="en">
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width,initial-scale=1">
+<title>Slide Timer · PowerPoint for Mac</title>
+<style>
+  :root { color-scheme: light; font-family: -apple-system, BlinkMacSystemFont, "Segoe UI", sans-serif; color:#172138; background:#f4f5f7 }
+  * { box-sizing:border-box }
+  body { margin:0; padding:58px 24px 40px }
+  main { max-width:1000px; margin:auto }
+  .eyebrow { font-size:12px; letter-spacing:2px; color:#687389; font-weight:650 }
+  h1 { font-size:clamp(34px,5vw,52px); letter-spacing:-2px; margin:14px 0 18px; font-weight:650; line-height:1.08 }
+  .lead { font-size:18px; color:#5a6578; line-height:1.6; max-width:570px; margin:0 0 32px }
+  .hero { display:grid; grid-template-columns:1fr 380px; gap:64px; align-items:center; padding-bottom:38px }
+  a { color:#216454; text-underline-offset:3px }
+  .download { display:inline-block; padding:12px 18px; border-radius:8px; color:white; background:#1e6553; text-decoration:none; font-weight:600 }
+  .caption { margin:17px 0 0; font-size:12px; line-height:1.5; color:#737d8e }
+  .timer { position:relative; isolation:isolate; width:100%; padding:25px 24px 14px; border:1px solid transparent; border-radius:23px; color:#e2e8e9; background:linear-gradient(145deg,#34363c 0%,#24262b 45%,#1b1d22 100%); box-shadow:inset 0 1px 1px #ffffff24,inset 0 0 0 1px #ffffff08,4px 7px 0 #17191e,5px 8px 0 #41434a,0 22px 38px #10131924 }
+  .lcd-bezel { padding:6px; border-radius:12px; background:linear-gradient(135deg,#121519,#3b3e42); box-shadow:inset 0 2px 4px #0009,0 1px 0 #ffffff16 }
+  .lcd { padding:10px 12px 7px; border-radius:6px; background:linear-gradient(115deg,#92b0b8,#bdd0d2 48%,#a7bfc5); color:#273c48; box-shadow:inset 3px 4px 9px #18303b45,inset -1px -1px 2px #efffff40 }
+  .lcd-top,.lcd-footer { display:flex; align-items:center; justify-content:space-between; gap:10px; font-size:9px; font-weight:650; letter-spacing:1px; text-transform:uppercase; min-height:15px }
+  #sound { padding:0; font-size:8px; font-weight:600; letter-spacing:.7px; background:transparent; border:0; color:#364e58; text-transform:uppercase }
+  #digits { display:block; width:100%; height:101px; margin:6px 0 3px; padding:0; border:0; background:transparent; color:#263844; cursor:pointer }
+  #lcd-digits { display:block; width:100%; height:100%; overflow:visible }
+  #lcd-digits .segment-on { fill:currentColor }
+  #lcd-digits .segment-off { fill:#263844; opacity:.055 }
+  #state { letter-spacing:.8px; font-size:8px }
+  #units { font-size:8px; word-spacing:25px; letter-spacing:.6px; opacity:.75 }
+  .controls { display:flex; justify-content:space-between; gap:16px; padding:22px 7px 0 }
+  button { font:inherit; cursor:pointer; -webkit-tap-highlight-color:transparent }
+  .controls button { width:48px; height:48px; flex:0 0 48px; display:grid; place-items:center; padding:0; border:1px solid transparent; border-radius:50%; color:#e2ecee; background:linear-gradient(145deg,#35383e,#22242a); box-shadow:0 2px 3px #0008,0 0 0 2px #17191c,inset 0 1px 1px #ffffff24; text-shadow:0 1px 2px #0008 }
+  #time { font-size:11px; font-stretch:condensed; font-weight:750; letter-spacing:-.6px }
+  #plus,#minus { font-size:30px; font-weight:400; line-height:1; padding-bottom:3px }
+  #minus { padding-bottom:5px }
+  #start svg { width:24px; height:24px; color:inherit; fill:currentColor }
+  #start[aria-pressed="true"] { color:#b9e4d2; background:linear-gradient(145deg,#3d4646,#252e31) }
+  .case-footer { display:flex; align-items:center; justify-content:space-between; padding:15px 9px 0; color:#858b93; font-size:7px; font-weight:600; letter-spacing:1.8px }
+  #reset { background:transparent; border:0; color:#b2b8c1; font-size:8px; letter-spacing:1px; padding:0 }
+  .sr-only { position:absolute; width:1px; height:1px; padding:0; margin:-1px; overflow:hidden; clip:rect(0,0,0,0); white-space:nowrap; border:0 }
+  button:focus-visible,a:focus-visible { outline:3px solid #719fbe; outline-offset:4px }
+  @media(hover:hover) { button:hover { filter:brightness(1.14) } }
+  .preview-label { font-size:12px; color:#737d8e; margin:15px 0 0; text-align:center; line-height:1.5 }
+  section { border-top:1px solid #dce0e7; padding:30px 0 12px }
+  h2 { font-size:22px; letter-spacing:-.5px; margin:0 0 18px }
+  ol { padding-left:24px; margin:0; max-width:830px }
+  li { padding-left:6px; margin-bottom:13px; line-height:1.65; color:#4d596d }
+  strong { color:#172138; font-weight:650 }
+  code { padding:2px 5px; background:#e7ebef; border-radius:4px; font-size:.92em; color:#26344b }
+  .note { font-size:14px; line-height:1.65; color:#5a6578; max-width:850px }
+  .examples { display:flex; gap:32px; flex-wrap:wrap; margin:22px 0 }
+  .example { font-size:14px; color:#647087 }
+  .example code { display:block; margin-bottom:8px; color:#203f37; background:none; padding:0; font-size:22px }
+  footer { margin-top:28px; font-size:12px; color:#737d8e }
+  @media(max-width:760px) { body{padding-top:32px}.hero{grid-template-columns:1fr;gap:28px}.preview{max-width:360px;width:100%}h1{letter-spacing:-1px}.lead{font-size:17px} }
+  @media(prefers-reduced-motion:no-preference) { button { transition:filter 150ms ease-out,transform 150ms ease-out } .controls button:not(:disabled):active { transform:scale(.96) } }
+</style>
+<main>
+  <div class="hero">
+    <div>
+      <div class="eyebrow">POWERPOINT FOR MAC</div>
+      <h1>A countdown.<br>On your slide.</h1>
+      <p class="lead">Set the time. Click to start. Pause when you need to. Hear the Hero alert three times when time is up.</p>
+      <a class="download" href="SlideTimer.bas" download>Get the VBA module</a>
+      <p class="caption">Native slide objects · Works offline · Save your deck as .pptm</p>
+    </div>
+    <div class="preview">
+      <div class="timer" aria-label="LCD countdown timer preview">
+        <div class="lcd-bezel"><div class="lcd">
+          <div class="lcd-top"><span>TIMER</span><button id="sound" aria-pressed="true" aria-label="Mute end sound">Sound on</button></div>
+          <button id="digits" aria-label="05:00. Start or pause countdown"><svg id="lcd-digits" viewBox="0 0 276 100" aria-hidden="true"></svg><span id="readout" class="sr-only">05:00</span></button>
+          <div class="lcd-footer"><span id="state" role="status" aria-live="polite">Ready</span><span id="units">MIN SEC</span></div>
+        </div></div>
+        <div class="controls">
+          <button id="time" aria-label="Next preset duration" title="Next preset duration">SET</button>
+          <button id="plus" aria-label="Add one minute" title="Add one minute">+</button>
+          <button id="minus" aria-label="Subtract one minute" title="Subtract one minute">−</button>
+          <button id="start" aria-label="Start" aria-pressed="false" title="Start or pause"><svg viewBox="0 0 28 28" aria-hidden="true"><path d="M3 6 14 14 3 22Z"/><rect x="17" y="6" width="3" height="16" rx=".4"/><rect x="23" y="6" width="3" height="16" rx=".4"/></svg><span id="start-label" class="sr-only">Start</span></button>
+        </div>
+        <div class="case-footer"><span>COUNTDOWN</span><button id="reset">RESET</button></div>
+      </div>
+      <p class="preview-label">Try it here. <strong>SET</strong> steps through presets, as in the slide show.<br>For a quick test: SET to 01:00, then <strong>−</strong> and play. Browser preview uses a synthesized chime.</p>
+    </div>
+  </div>
+  <section>
+    <h2>Install in your presentation</h2>
+    <ol>
+      <li>Open your deck in desktop PowerPoint for Mac. <strong>Save As</strong> a <strong>PowerPoint Macro-Enabled Presentation (.pptm)</strong>.</li>
+      <li>Choose <strong>Tools → Macro → Visual Basic Editor</strong> from the Mac menu bar. Select your presentation's project.</li>
+      <li>In the editor, choose <strong>File → Import File…</strong> and select <a href="SlideTimer.bas" download>SlideTimer.bas</a>. Import it once. If import is unavailable, choose <strong>Insert → Module</strong> and paste <a href="SlideTimer-Paste.txt">SlideTimer-Paste.txt</a>.</li>
+      <li>Return to PowerPoint and select a slide in <strong>Normal</strong> view. Open <strong>Tools → Macro → Macros…</strong>, select <code>Timer_Insert</code> and click <strong>Run</strong>.</li>
+      <li>Enter the duration (for example <code>5</code> or <code>1:30</code>) and save. Choose <strong>Slide Show → From Current Slide</strong>, then click the round <strong>play/pause</strong> button.</li>
+    </ol>
+    <p class="note">Enable macros for the presentation when PowerPoint asks. This is a VBA component you import into each deck, rather than a precompiled add-in. The code and timer stay in the .pptm file.</p>
+  </section>
+  <section>
+    <h2>Your time, your controls</h2>
+    <div class="examples">
+      <div class="example"><code>5</code>5 minutes</div>
+      <div class="example"><code>1:30</code>90 seconds</div>
+      <div class="example"><code>0:10</code>10 seconds</div>
+      <div class="example"><code>1:02:03</code>1 hour, 2 minutes, 3 seconds</div>
+    </div>
+    <p class="note"><strong>Click the digits or play/pause</strong> to start, pause or resume. <strong>Reset</strong> restores the duration. <strong>SET</strong> steps through presets (1, 2, 3, 5, 10, 15, 20, 30, 45, 60 min). <strong>+</strong> and <strong>−</strong> adjust by one minute. <strong>Sound</strong> toggles the end alert. In Normal view, move or resize the group and use <code>Timer_Configure</code> to type any duration.</p>
+    <p class="note">One timer per slide. Leaving the slide while it runs resets it; after the finish the macro stops so you can move on normally. Duration range: 0:01–23:59:59. Keep the controls grouped, set the slide transition to None, and import the module into every presentation that uses it.</p>
+  </section>
+  <section>
+    <h2>Before presenting</h2>
+    <p class="note">Run <code>Timer_RunSelfTests</code> (expect 30 checks passed), then <code>Timer_TestSound</code>, and try a short countdown in your usual presentation setup. The native timer plays the macOS Hero sound three times at your alert volume.</p>
+    <p class="note">The preview above is a separate JavaScript demonstration. It does not verify PowerPoint compatibility. <a href="README.md">Read the full instructions, customization and troubleshooting</a>.</p>
+  </section>
+  <footer>Slide Timer 1.1.8 · Editable VBA source included · Desktop PowerPoint for Mac</footer>
+</main>
+<script>
+  const MAX = 86399;
+  function formatDuration(seconds, hours = false) {
+    const value = Math.max(0, Math.ceil(seconds));
+    const two = n => String(n).padStart(2, '0');
+    if (value >= 3600 || hours) return `${two(Math.floor(value / 3600))}:${two(Math.floor(value % 3600 / 60))}:${two(value % 60)}`;
+    return `${two(Math.floor(value / 60))}:${two(value % 60)}`;
+  }
+  let duration = 300, remaining = duration, deadline = 0, running = false, finished = false, sound = true, audio;
+  const el = id => document.getElementById(id);
+  function unlockAudio() {
+    try { audio ||= new (window.AudioContext || window.webkitAudioContext)(); audio.resume().catch(() => {}); } catch (_) {}
+  }
+  function chime() {
+    if (!sound || !audio || audio.state !== 'running') return;
+    for (const [offset, frequency] of [[0, 659.25], [.2, 880], [.4, 1046.5]]) {
+      const oscillator = audio.createOscillator(), gain = audio.createGain(), time = audio.currentTime + offset;
+      oscillator.type = 'sine'; oscillator.frequency.value = frequency;
+      gain.gain.setValueAtTime(0, time); gain.gain.linearRampToValueAtTime(.14, time + .01); gain.gain.exponentialRampToValueAtTime(.001, time + .45);
+      oscillator.connect(gain); gain.connect(audio.destination); oscillator.start(time); oscillator.stop(time + .5);
+    }
+  }
+  function capture() {
+    if (!running) return;
+    remaining = Math.max(0, (deadline - performance.now()) / 1000);
+    if (!remaining) { running = false; finished = true; chime(); setTimeout(() => finished && chime(), 1200); setTimeout(() => finished && chime(), 2400); }
+  }
+  const segmentPaths = {
+    A:'9,0 45,0 51,6 45,12 9,12 3,6',
+    B:'46,14 52,8 52,42 46,48 40,42 40,20',
+    C:'46,52 52,58 52,92 46,98 40,92 40,58',
+    D:'9,88 45,88 51,94 45,100 9,100 3,94',
+    E:'6,52 12,58 12,86 6,92 0,86 0,58',
+    F:'6,8 12,14 12,42 6,48 0,42 0,14',
+    G:'9,44 45,44 51,50 45,56 9,56 3,50'
+  };
+  const digitSegments = ['ABCDEF','BC','ABGED','ABGCD','FGBC','AFGCD','AFGECD','ABC','ABCDEFG','ABCFGD'];
+  function lcdMarkup(text) {
+    let cursor = 0, body = '';
+    for (const character of text) {
+      if (character === ':') {
+        body += `<g transform="translate(${cursor},0)"><rect x="1" y="29" width="7" height="8" rx="1" fill="currentColor"/><rect x="1" y="65" width="7" height="8" rx="1" fill="currentColor"/></g>`;
+        cursor += 22;
+      } else {
+        const active = digitSegments[Number(character)];
+        body += `<g transform="translate(${cursor},0)">` + Object.entries(segmentPaths).map(([name, points]) => `<polygon points="${points}" class="${active.includes(name) ? 'segment-on' : 'segment-off'}"/>`).join('') + '</g>';
+        cursor += 64;
+      }
+    }
+    return { width:cursor - 12 + 10, body:`<g transform="translate(10,0) skewX(-6)">${body}</g>` };
+  }
+  let lastDisplayText = '';
+  function render() {
+    const seconds = Math.ceil(remaining), text = formatDuration(seconds, duration >= 3600), lcd = lcdMarkup(text);
+    el('readout').textContent = text;
+    if (text !== lastDisplayText) {
+      el('lcd-digits').innerHTML = lcd.body;
+      el('lcd-digits').setAttribute('viewBox', `0 0 ${lcd.width} 100`);
+      lastDisplayText = text;
+    }
+    el('digits').setAttribute('aria-label', `${text}. Start or pause countdown`);
+    el('digits').style.color = finished ? '#733c3b' : '#263844';
+    const state = finished ? "Time's up" : running ? 'Running' : remaining === duration ? 'Ready' : 'Paused';
+    if (el('state').textContent !== state) el('state').textContent = state;
+    const action = finished ? 'Restart' : running ? 'Pause' : state === 'Ready' ? 'Start' : 'Resume';
+    el('start-label').textContent = action;
+    el('start').setAttribute('aria-label', action);
+    el('start').setAttribute('aria-pressed', String(running));
+    el('units').textContent = duration >= 3600 ? 'HR MIN SEC' : 'MIN SEC';
+    el('sound').textContent = sound ? 'Sound on' : 'Sound off';
+    el('sound').setAttribute('aria-pressed', String(sound));
+    el('sound').setAttribute('aria-label', sound ? 'Mute end sound' : 'Enable end sound');
+  }
+  function adjustDuration(delta) {
+    capture();
+    const next = Math.min(MAX, Math.max(1, duration + delta)), change = next - duration;
+    if (!change) return;
+    duration = next;
+    remaining = finished ? duration : Math.min(MAX, Math.max(1, remaining + change));
+    finished = false;
+    if (running) deadline = performance.now() + remaining * 1000;
+    render();
+  }
+  function toggle() {
+    unlockAudio(); capture();
+    if (running) running = false;
+    else { if (finished || remaining <= 0) remaining = duration; finished = false; deadline = performance.now() + remaining * 1000; running = true; }
+    render();
+  }
+  function reset() { running = false; finished = false; remaining = duration; render(); }
+  el('start').onclick = toggle; el('digits').onclick = toggle;
+  el('reset').onclick = reset;
+  el('plus').onclick = () => adjustDuration(60);
+  el('minus').onclick = () => adjustDuration(-60);
+  el('sound').onclick = () => { unlockAudio(); sound = !sound; render(); };
+  const PRESETS = [60, 120, 180, 300, 600, 900, 1200, 1800, 2700, 3600];
+  el('time').onclick = () => {
+    duration = PRESETS.find(p => p > duration) ?? PRESETS[0];
+    reset();
+  };
+  setInterval(() => { capture(); render(); }, 50);
+  render();
+</script>
+</html>
