@@ -28,10 +28,10 @@ def bind(library, name, result, *arguments):
 
 
 def main():
-    source = (ROOT / "SlideTimer.bas").read_text()
-    assert source.split("\n", 1)[1] == (ROOT / "SlideTimer-Paste.txt").read_text()
-    events = (ROOT / "SlideTimerEvents.cls").read_text()
-    assert events[events.index("Option Explicit"):] == (ROOT / "SlideTimerEvents-Paste.txt").read_text()
+    source = (ROOT / "powerpoint/SlideTimer.bas").read_text()
+    assert source.split("\n", 1)[1] == (ROOT / "powerpoint/paste/SlideTimer-Paste.txt").read_text()
+    events = (ROOT / "powerpoint/SlideTimerEvents.cls").read_text()
+    assert events[events.index("Option Explicit"):] == (ROOT / "powerpoint/paste/SlideTimerEvents-Paste.txt").read_text()
     print("Import and paste distributions match.")
 
     if sys.platform != "darwin":

@@ -2,7 +2,7 @@
 <html lang="en">
 <meta charset="utf-8">
 <meta name="viewport" content="width=device-width,initial-scale=1">
-<title>Slide Timer · PowerPoint for Mac</title>
+<title>Start here · Slide Timer for PowerPoint on Mac</title>
 <style>
   :root { color-scheme: light; font-family: -apple-system, BlinkMacSystemFont, "Segoe UI", sans-serif; color:#172138; background:#f4f5f7 }
   * { box-sizing:border-box }
@@ -50,6 +50,26 @@
   .examples { display:flex; gap:32px; flex-wrap:wrap; margin:22px 0 }
   .example { font-size:14px; color:#647087 }
   .example code { display:block; margin-bottom:8px; color:#203f37; background:none; padding:0; font-size:22px }
+  nav { display:flex; gap:22px; flex-wrap:wrap; margin:0 0 24px; font-size:14px }
+  h3 { font-size:17px; margin:25px 0 10px }
+  .table-scroll { overflow-x:auto }
+  table { width:100%; border-collapse:collapse; font-size:14px; line-height:1.6; margin:14px 0 }
+  th,td { padding:10px 12px; text-align:left; vertical-align:top; border-bottom:1px solid #dce0e7 }
+  th { color:#172138; font-weight:650 }
+  td { color:#4d596d }
+  details { border-top:1px solid #dce0e7; padding:14px 0; max-width:850px }
+  summary { cursor:pointer; font-weight:600; line-height:1.5 }
+  details p,details li { font-size:14px; line-height:1.65; color:#5a6578 }
+  details ol { margin-top:14px }
+  .shot { margin:18px 0 25px; max-width:850px }
+  .shot.dialog { max-width:620px }
+  .shot a { display:block; border-radius:8px; overflow:hidden }
+  .shot img { display:block; width:100%; height:auto; border:1px solid #dce0e7; border-radius:8px; background:#fff }
+  .shot figcaption { margin-top:9px; color:#5a6578; font-size:13px; line-height:1.6 }
+  .walkthrough { margin:14px 0 6px; padding-bottom:0 }
+  .walkthrough[open] { padding-bottom:10px }
+  h4 { margin:22px 0 10px; font-size:15px }
+  .setup-note { padding-left:16px; border-left:3px solid #1e6553 }
   footer { margin-top:28px; font-size:12px; color:#737d8e }
   @media(max-width:760px) { body{padding-top:32px}.hero{grid-template-columns:1fr;gap:28px}.preview{max-width:360px;width:100%}h1{letter-spacing:-1px}.lead{font-size:17px} }
   @media(prefers-reduced-motion:no-preference) { button { transition:filter 150ms ease-out,transform 150ms ease-out } .controls button:not(:disabled):active { transform:scale(.96) } }
@@ -59,9 +79,9 @@
     <div>
       <div class="eyebrow">POWERPOINT FOR MAC</div>
       <h1>A countdown.<br>On your slide.</h1>
-      <p class="lead">Set the time. Click to start. Pause when you need to. Choose an end sound to hear three times when time is up.</p>
-      <a class="download" href="SlideTimer.bas" download>Get the VBA module</a>
-      <p class="caption">Native slide objects · Works offline · Save your deck as .pptm</p>
+      <p class="lead">A timer you can put directly on your slide. Choose the time and sound, resize it to fit, then click play when the activity begins.</p>
+      <a class="download" href="downloads/SlideTimer-Mac.zip" download>Download setup ZIP</a>
+      <p class="caption">Includes both PowerPoint files · Desktop PowerPoint for Mac · Save as .pptm</p>
     </div>
     <div class="preview">
       <div class="timer" aria-label="LCD countdown timer preview">
@@ -81,35 +101,146 @@
       <p class="preview-label">Try it here. <strong>SET</strong> steps through presets, as in the slide show.<br>For a quick test: SET to 01:00, then <strong>−</strong> and play. Browser preview uses a synthesized chime.</p>
     </div>
   </div>
-  <section>
-    <h2>Install in your presentation</h2>
+  <nav aria-label="Guide sections">
+    <a href="#setup">Set up</a><a href="#tips">Action-slide tip &amp; resizing</a><a href="#use">Use the timer</a><a href="#help">Get help</a>
+  </nav>
+  <section id="setup">
+    <h2>Set up once in your presentation</h2>
+    <p class="note">Download and extract the setup ZIP. You need desktop PowerPoint on a Mac; this version does not run in PowerPoint for Windows, in a browser, or in an exported PDF.</p>
+    <p class="note">The screenshots show a real setup in PowerPoint for Mac. Your presentation’s name will be different. Expand a step whenever you want to see where to click.</p>
     <ol>
-      <li>Open your deck in desktop PowerPoint for Mac. <strong>Save As</strong> a <strong>PowerPoint Macro-Enabled Presentation (.pptm)</strong>.</li>
-      <li>Choose <strong>Tools → Macro → Visual Basic Editor</strong> from the Mac menu bar. Select your presentation's project.</li>
-      <li>In the editor, choose <strong>File → Import File…</strong> and import both <a href="SlideTimer.bas" download>SlideTimer.bas</a> and <a href="SlideTimerEvents.cls" download>SlideTimerEvents.cls</a>, once each. If import is unavailable, use the <a href="README.md">paste instructions</a> for the standard module and class module.</li>
-      <li>Return to PowerPoint and select a slide in <strong>Normal</strong> view. Open <strong>Tools → Macro → Macros…</strong>, select <code>Timer_Insert</code> and click <strong>Run</strong>.</li>
-      <li>Enter the duration (for example <code>5</code> or <code>1:30</code>), then choose a sound by number or name. Type <code>p 2</code> to preview Glass, <code>2</code> to choose it, or <code>0</code> for no sound. Save. Start the show normally, then click the timer’s <strong>play/pause</strong> button or <strong>digits</strong>.</li>
+      <li><strong>Save your presentation as .pptm.</strong> In PowerPoint, choose <strong>File → Save As → PowerPoint Macro-Enabled Presentation</strong>. This format keeps the timer’s code.
+        <details class="walkthrough"><summary>Show the file-format screenshot</summary><figure class="shot">
+        <a href="assets/setup/01-save-as-pptm.png" target="_blank" rel="noopener"><img src="assets/setup/01-save-as-pptm.png" width="1828" height="1098" alt="Save As menu with PowerPoint Macro-Enabled Presentation (.pptm) selected" loading="lazy" decoding="async"></a>
+        <figcaption>Choose this <strong>File Format</strong>, then click Save. Typing .pptm in the filename alone does not change the format. Click the image for a larger view.</figcaption>
+      </figure></details>
+      </li>
+      <li><strong>Open the Visual Basic Editor.</strong> Choose <strong>Tools → Macro → Visual Basic Editor</strong>. Find your presentation in the list on the left. If the list is missing, choose <strong>View → Project Explorer</strong>.
+        <details class="walkthrough"><summary>Show the PowerPoint menu</summary><figure class="shot">
+        <a href="assets/setup/02-open-visual-basic-editor.png" target="_blank" rel="noopener"><img src="assets/setup/02-open-visual-basic-editor.png" width="2052" height="570" alt="PowerPoint Tools menu with Macro and Visual Basic Editor highlighted" loading="lazy" decoding="async"></a>
+        <figcaption>Use <strong>Tools → Macro → Visual Basic Editor</strong> in the Mac menu bar. Click the image for a larger view.</figcaption>
+      </figure></details>
+      </li>
+      <li><strong>Import both timer files.</strong> Right-click your presentation’s <strong>VBAProject</strong> entry and choose <strong>Import File…</strong>. Import <a href="powerpoint/SlideTimer.bas" download>SlideTimer.bas</a> from the package’s <strong>powerpoint</strong> folder. Repeat for <a href="powerpoint/SlideTimerEvents.cls" download>SlideTimerEvents.cls</a>. You can also use <strong>File → Import File…</strong> if available. The first file creates the timer; the second safely cleans up when you close the presentation.
+        <details class="walkthrough"><summary>Show both imports and the finished result</summary>
+          <figure class="shot dialog">
+        <a href="assets/setup/03-import-file-menu.png" target="_blank" rel="noopener"><img src="assets/setup/03-import-file-menu.png" width="1258" height="934" alt="Right-click menu on the presentation VBAProject entry with Import File highlighted" loading="lazy" decoding="async"></a>
+        <figcaption>Right-click <strong>your own presentation</strong> on the left, then choose <strong>Import File…</strong>. Your presentation’s name will differ from the example. Click the image for a larger view.</figcaption>
+      </figure><figure class="shot">
+        <a href="assets/setup/04-import-slide-timer.png" target="_blank" rel="noopener"><img src="assets/setup/04-import-slide-timer.png" width="1838" height="900" alt="File picker in the powerpoint folder with SlideTimer.bas selected" loading="lazy" decoding="async"></a>
+        <figcaption>First choose <strong>SlideTimer.bas</strong> in the <strong>powerpoint</strong> folder, then click <strong>Open</strong>. Click the image for a larger view.</figcaption>
+      </figure><figure class="shot">
+        <a href="assets/setup/05-import-events.png" target="_blank" rel="noopener"><img src="assets/setup/05-import-events.png" width="1820" height="890" alt="File picker with SlideTimerEvents.cls selected" loading="lazy" decoding="async"></a>
+        <figcaption>Repeat the import for <strong>SlideTimerEvents.cls</strong>. Both files are required. Click the image for a larger view.</figcaption>
+      </figure><figure class="shot dialog">
+        <a href="assets/setup/06-modules-ready.png" target="_blank" rel="noopener"><img src="assets/setup/06-modules-ready.png" width="648" height="642" alt="Project Explorer showing SlideTimer under Modules and SlideTimerEvents under Class Modules" loading="lazy" decoding="async"></a>
+        <figcaption>The result should show <strong>Modules → SlideTimer</strong> and <strong>Class Modules → SlideTimerEvents</strong>. You do not need to edit their code. Click the image for a larger view.</figcaption>
+      </figure>
+        </details>
+      </li>
+      <li><strong>Pick your slide.</strong> Return to PowerPoint’s normal editing view and select the slide for the timer. For an activity, try the <a href="#tips">Action-slide copy workflow below</a>. Set the timer slide’s transition to <strong>None</strong>.</li>
+      <li><strong>Create the timer.</strong> Open <strong>Tools → Macro → Macros…</strong>, choose <code>Timer_Insert</code> and click <strong>Run</strong>. Enter a duration, then choose an end sound by number or name. Type <code>p 2</code> to preview Glass, <code>2</code> to choose it, or <code>0</code> for no sound.
+        <details class="walkthrough"><summary>Show the timer, duration and sound steps</summary>
+          <h4>Open Macros and run Timer_Insert</h4><figure class="shot">
+        <a href="assets/setup/07-view-macros.png" target="_blank" rel="noopener"><img src="assets/setup/07-view-macros.png" width="2800" height="1708" alt="PowerPoint View tab with the Macros button above an Action slide" loading="lazy" decoding="async"></a>
+        <figcaption>Select the slide for the timer, then open <strong>Tools → Macro → Macros…</strong> or use the <strong>View → Macros</strong> ribbon button shown here. Click the image for a larger view.</figcaption>
+      </figure><figure class="shot dialog">
+        <a href="assets/setup/09-run-timer-insert.png" target="_blank" rel="noopener"><img src="assets/setup/09-run-timer-insert.png" width="968" height="1064" alt="Macros dialog with Timer_Insert selected and a Run button" loading="lazy" decoding="async"></a>
+        <figcaption>Choose <strong>Timer_Insert</strong>, then click <strong>Run</strong>. If needed, select your presentation in <strong>Macros in</strong>. Click the image for a larger view.</figcaption>
+      </figure>
+          <h4>Enter the duration</h4><figure class="shot dialog">
+        <a href="assets/setup/10-set-duration.png" target="_blank" rel="noopener"><img src="assets/setup/10-set-duration.png" width="1082" height="492" alt="Slide Timer duration dialog with 05:00 entered" loading="lazy" decoding="async"></a>
+        <figcaption>Enter your activity’s time. <strong>3</strong> means three minutes; <strong>1:30</strong> means ninety seconds; <strong>05:00</strong> in this example means five minutes. Click the image for a larger view.</figcaption>
+      </figure>
+          <h4>Choose or preview the end sound</h4><figure class="shot dialog">
+        <a href="assets/setup/11-choose-sound.png" target="_blank" rel="noopener"><img src="assets/setup/11-choose-sound.png" width="1082" height="900" alt="End-sound chooser with the numbered sound list and Ping entered" loading="lazy" decoding="async"></a>
+        <figcaption>Choose a number or name and click <strong>OK</strong>. <strong>2</strong> selects Glass; <strong>0</strong> means no sound. Click the image for a larger view.</figcaption>
+      </figure><figure class="shot dialog">
+        <a href="assets/setup/12-preview-sound.png" target="_blank" rel="noopener"><img src="assets/setup/12-preview-sound.png" width="1082" height="900" alt="End-sound chooser with p 2 entered to preview Glass" loading="lazy" decoding="async"></a>
+        <figcaption>Enter <strong>p 2</strong> and click <strong>OK</strong> to hear Glass. When the chooser returns, enter <strong>2</strong> or <strong>Glass</strong> and click <strong>OK</strong> to keep it. Click the image for a larger view.</figcaption>
+      </figure>
+        </details>
+      </li>
+      <li><strong>Move, resize and save.</strong> Select the whole timer group, drag it into place, and drag a corner handle to make it larger or smaller. <a href="#resize-example">See the selected timer and resize handles</a>. Save the file.</li>
+      <li><strong>Present normally.</strong> Start the show using PowerPoint’s usual Slide Show commands. Click the timer’s <strong>play/pause button or digits</strong> to start, pause or resume.</li>
     </ol>
-    <p class="note"><strong>Import both modules:</strong> <a href="SlideTimer.bas">SlideTimer.bas</a> and <a href="SlideTimerEvents.cls">SlideTimerEvents.cls</a>. Use PowerPoint’s usual slide-show commands. When upgrading from 1.2.0–1.2.3, run <code>Timer_Initialize</code> once in Normal view to remove old click-start animation steps, then save. Run <code>Timer_Shutdown</code> before editing the VBA code. See <a href="README.md">the full setup instructions</a>.</p>
-    <p class="note">Enable macros for the presentation when PowerPoint asks. This is a VBA component you import into each deck, rather than a precompiled add-in. The code and timer stay in the .pptm file.</p>
+    <p class="note setup-note">Allow macros for this presentation if PowerPoint asks. You only add the two files once per deck; later shows need no startup macro. Copying the timer’s appearance to another deck does not copy its code.</p>
+    <details id="paste">
+      <summary>Import File is unavailable: use the paste alternative</summary>
+      <ol>
+        <li>In the Visual Basic Editor, select your presentation and choose <strong>Insert → Module</strong>.</li>
+        <li>Open <a href="powerpoint/paste/SlideTimer-Paste.txt">SlideTimer-Paste.txt</a>, copy everything, and paste it into the new module’s code window. Set its <strong>(Name)</strong> to <strong>SlideTimer</strong> in the Properties window.</li>
+        <li>Choose <strong>Insert → Class Module</strong>. In its Properties window, set <strong>(Name)</strong> to exactly <strong>SlideTimerEvents</strong>. Use <strong>View → Properties Window</strong> if needed.</li>
+        <li>Open <a href="powerpoint/paste/SlideTimerEvents-Paste.txt">SlideTimerEvents-Paste.txt</a> and paste everything into that class module. Return to PowerPoint and continue with choosing a slide above.</li>
+      </ol>
+      <p>Use either importing or pasting. Doing both creates duplicate code.</p>
+    </details>
   </section>
-  <section>
-    <h2>Your time, your controls</h2>
+  <section id="tips">
+    <h2>Tip: put the timer on a copy of the Action slide</h2>
+    <p class="note">Keep the original <strong>Action</strong> slide for explaining the activity and answering questions. Right-click its thumbnail and choose <strong>Duplicate Slide</strong>. Add the timer to that copy, then advance to it when the activity begins. Participants can still read the same instructions while the countdown runs.</p>
+    <h3>Resize it however you like</h3>
+    <p class="note">A small timer beneath the instructions keeps the activity easy to read. A larger timer is easier to see from the back of the room. In editing view, select the <strong>whole timer group</strong>, drag a <strong>corner handle</strong> to resize it, and drag the group to place it anywhere on the slide. Keep its parts grouped so the buttons and digits stay together.</p>
+    <figure class="shot" id="resize-example">
+        <a href="assets/setup/13-resize-timer.png" target="_blank" rel="noopener"><img src="assets/setup/13-resize-timer.png" width="2188" height="1230" alt="Timer selected as one group on an Action slide, with corner resize handles around the whole timer" loading="lazy" decoding="async"></a>
+        <figcaption>In editing view, select the <strong>whole timer group</strong>. Drag a <strong>corner handle</strong> to resize it and drag the group into position. Set the duration to match your own activity. Click the image for a larger view.</figcaption>
+      </figure>
+  </section>
+  <section id="use">
+    <h2>Use your timer</h2>
     <div class="examples">
-      <div class="example"><code>5</code>5 minutes</div>
-      <div class="example"><code>1:30</code>90 seconds</div>
+      <div class="example"><code>3</code>3 minutes</div>
+      <div class="example"><code>1:30</code>1 minute, 30 seconds</div>
       <div class="example"><code>0:10</code>10 seconds</div>
       <div class="example"><code>1:02:03</code>1 hour, 2 minutes, 3 seconds</div>
     </div>
-    <p class="note"><strong>Click the digits or play/pause</strong> to start, pause or resume. <strong>Reset</strong> restores the duration. <strong>SET</strong> steps through presets (1, 2, 3, 5, 10, 15, 20, 30, 45, 60 min). <strong>+</strong> and <strong>−</strong> adjust by one minute. <strong>Sound</strong> toggles the end alert. In Normal view, move or resize the group and use <code>Timer_Configure</code> to type any duration. Run <code>Timer_ChooseSound</code> to change or preview the current timer’s sound later.</p>
-    <p class="note">One timer per slide. Timers keep counting across slides, app switches and a brief exit from the show. Returning preserves running, paused and finished state. Duration range: 0:01–23:59:59. Keep the controls grouped, set the slide transition to None, and import both modules into every presentation that uses it.</p>
+    <div class="table-scroll"><table>
+      <thead><tr><th>Control</th><th>What it does</th></tr></thead>
+      <tbody>
+        <tr><td><strong>Play/pause or digits</strong></td><td>Start, pause or resume. After TIME’S UP, start a fresh countdown.</td></tr>
+        <tr><td><strong>SET</strong></td><td>Choose the next preset: 1, 2, 3, 5, 10, 15, 20, 30, 45 or 60 minutes. Waits for play.</td></tr>
+        <tr><td><strong>+ / −</strong></td><td>Add or subtract one minute, including while running or paused.</td></tr>
+        <tr><td><strong>RESET</strong></td><td>Restore the configured duration and wait for play.</td></tr>
+        <tr><td><strong>SOUND ON / OFF</strong></td><td>Enable or mute this timer’s end sound.</td></tr>
+      </tbody>
+    </table></div>
+    <p class="note">To change an exact duration later, select the timer’s slide in editing view and run <code>Timer_Configure</code>. To change or preview its sound, run <code>Timer_ChooseSound</code>. Choose <code>0</code> for silence; the choice is saved separately for each timer.</p>
+    <h3>Sound through your chosen speakers</h3>
+    <p class="note">Choose the device in <strong>System Settings → Sound → Output</strong> on your Mac, and check media volume. Run <code>Timer_TestSound</code> on the timer’s slide to check it. Before presenting, try a short countdown with your actual external speakers or display.</p>
+    <h3>Moving between slides or apps</h3>
+    <p class="note">A running timer keeps counting when you change slides, switch apps or briefly leave the show with Esc. Return to the same running, paused or finished state. <strong>Pause if you want it to stop counting.</strong> Closing the presentation ends the timer session. Keep the Mac awake during a countdown.</p>
+    <p class="note">After a rehearsal, press RESET and save if you want the slide to open showing its full duration. You can duplicate a timer slide to reuse its layout, size and settings.</p>
   </section>
-  <section>
-    <h2>Before presenting</h2>
-    <p class="note">Run <code>Timer_RunSelfTests</code> (expect 59 checks passed), then <code>Timer_TestSound</code>, and try a short countdown in your usual presentation setup. The native timer plays the sound chosen for that timer three times through your selected macOS media output and volume.</p>
-    <p class="note">The preview above is a separate JavaScript demonstration. It does not verify PowerPoint compatibility. <a href="README.md">Read the full instructions, customization and troubleshooting</a>.</p>
+  <section id="help">
+    <h2>Help with common problems</h2>
+    <details>
+      <summary>The timer does not start when I click it</summary>
+      <p>Use Slide Show view, allow macros, and save the file as <strong>.pptm</strong>. Make sure both timer files are in this presentation. In Presenter View, the clickable timer is on the audience slide display. The remote and spacebar navigate slides normally.</p>
+    </details>
+    <details>
+      <summary>No sound, or sound comes from the wrong speakers</summary>
+      <p>Check SOUND ON, then <strong>System Settings → Sound → Output</strong> and media volume. Select this timer’s slide in editing view and run <code>Timer_TestSound</code>. If playback still fails, run <code>Timer_CheckCurrent</code> for its error message.</p>
+    </details>
+    <details>
+      <summary>PowerPoint says SlideTimerEvents is missing</summary>
+      <p>Import <strong>SlideTimerEvents.cls</strong> too. For the paste route, it must be a <strong>Class Module</strong> named exactly <strong>SlideTimerEvents</strong>; a normal Module is different.</p>
+    </details>
+    <details>
+      <summary>I am updating an existing timer</summary>
+      <p>Replace both modules with the updated pair. In 1.2.2 or later, run <code>Timer_Shutdown</code> before changing code. If using 1.2.0/1.2.1 after a sound failure or crash, restart PowerPoint first and do not run that old sound/shutdown code. See the <a href="docs/UPDATING.md">update guide</a> for all steps.</p>
+      <p>After replacing files from 1.2.0–1.2.3, run <code>Timer_Initialize</code> once in editing view and save to remove the old hidden click-start animations. Later shows start normally.</p>
+      <figure class="shot dialog">
+        <a href="assets/setup/08-upgrade-cleanup.png" target="_blank" rel="noopener"><img src="assets/setup/08-upgrade-cleanup.png" width="844" height="912" alt="Macros dialog with Timer_Initialize selected for one-time upgrade cleanup" loading="lazy" decoding="async"></a>
+        <figcaption><strong>Updating an older timer only:</strong> run Timer_Initialize once after replacing code from 1.2.0–1.2.3. For a <strong>new timer</strong>, use <strong>Timer_Insert</strong> instead; later shows start normally. Click the image for a larger view.</figcaption>
+      </figure>
+    </details>
+    <details>
+      <summary>A part is missing or the controls broke after ungrouping</summary>
+      <p>In editing view, select the slide and run <code>Timer_RefreshStyle</code>. It rebuilds the timer and keeps its duration, sound, position and width. Resize and move it as one group afterward.</p>
+    </details>
+    <p class="note">More help: <a href="docs/SETUP.md">setup</a> · <a href="docs/USING.md">everyday use</a> · <a href="docs/TROUBLESHOOTING.md">troubleshooting</a>. The browser preview above uses a synthesized chime; it is a demonstration, not a test of PowerPoint.</p>
   </section>
-  <footer>Slide Timer 1.2.4 · Editable VBA source included · Desktop PowerPoint for Mac</footer>
+  <footer>Slide Timer 1.2.4 · Desktop PowerPoint for Mac · <a href="docs/DEVELOPMENT.md">Developer notes</a> · <a href="LICENSE">MIT license</a></footer>
 </main>
 <script>
   const MAX = 86399;

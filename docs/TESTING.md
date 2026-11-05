@@ -1,5 +1,7 @@
 # PowerPoint acceptance checks for 1.2.4
 
+[← Developer guide](DEVELOPMENT.md) · Run terminal commands from the repository root.
+
 The native smoke check has run on macOS. VBA compilation, Office events,
 presenter-remote input and physical audio routing require PowerPoint testing.
 The browser preview is not evidence for these checks.
@@ -12,6 +14,9 @@ before editing code, using breakpoints, or pressing VBE Reset/End.
 
 | Scenario | Expected result |
 | --- | --- |
+| Follow the setup ZIP/START-HERE instructions in a fresh presentation | Both files import, duration/sound prompts work, and the timer starts from its own controls. |
+| Expand the setup screenshots in START-HERE, then open the illustrated SETUP guide | All images load with clear captions; the finished-import image shows both modules, and Timer_Initialize appears as upgrade-only. |
+| Duplicate an Action slide, insert the timer on the copy, then resize the whole group smaller and larger | The original stays available for instructions; the copy’s digits/buttons remain usable after resizing and moving. |
 | Start a fresh show using PowerPoint’s normal command after reopening the deck, without running initialization | Timer stays Ready until its own play/pause or digits are clicked, then counts normally. |
 | Press remote next, spacebar or right arrow on a Ready timer slide | Only ordinary navigation/animations advance; no timer starts or resumes and no extra start step exists. |
 | Upgrade a deck with old click-start effects, then run `Timer_Initialize` in Normal view and save | Every old tagged start effect and shape is removed. Timer duration, sound choices, placement and user content/animation order remain. |
@@ -47,7 +52,7 @@ before editing code, using breakpoints, or pressing VBE Reset/End.
 | Use B/W to blank the show, then restore it | No timer redraw unblanks the show; the deadline continues. |
 | Delete a background timer or its slide in Normal view | Remaining timers keep running; no unhandled callback error. |
 | Close the deck while a timer is running or an alert is playing | Before-close event cancels native callbacks and terminates/reaps the owned afplay child before VBA unload; PowerPoint stays usable. |
-| Attempt to close, then cancel the close | Timer remains paused; initialize/present again and resume it. |
+| Attempt to close, then cancel the close | Timer remains paused; use its controls to resume it. |
 | Close and reopen the deck, then start the show normally | Clicking play initializes the configured duration and background updates; no startup macro is needed. |
 | Duplicate a timer slide | Each timer retains independent settings/state and has no click-start cue. |
 | Upgrade an existing flat-layout 1.1.x timer and run `Timer_Initialize` | No cue is added. The timer stays in place with its duration/sound settings; its own controls work. |
