@@ -1,152 +1,171 @@
 # Slide Timer for PowerPoint on Mac
 
-A countdown timer that lives **on your slide**. Insert it once, then start, pause, adjust and reset it with clicks during the slide show. At zero it shows **TIME'S UP** and plays an alert sound.
-It is a single VBA module. You don't install an add-in and it doesn't need a network connection. The timer is built from ordinary PowerPoint shapes, so it travels with your `.pptm` file.
+A countdown timer that lives **on your slide**. Start, pause and resume by clicking the timer’s play/pause button or digits. At zero it shows **TIME'S UP** and plays your chosen macOS sound three times through the selected **media output**.
+
+The timer keeps counting when you change slides, switch apps, or press Esc to leave the slide show briefly. Each timer keeps its own running, paused, ready or finished state while the deck stays open.
+
 ![Slide Timer showing 05:00 with SET, plus, minus and play/pause buttons](Timer-Preview.png)
 
 ## Features
 
-- **LCD look:** slanted seven-segment digits drawn as native shapes, so no special font is needed.
-- **Click controls in Slide Show view:** play/pause, SET presets, +/− one minute, reset, and sound on/off.
-- **Accurate timing:** the time is calculated from a monotonic clock and a deadline, so the countdown doesn't drift.
-- **End alert:** the macOS *Hero* sound plays three times at zero, at your system alert volume. You can turn it off per timer.
-- **Durations from 1 second to 23:59:59.** An hours field appears automatically for timers of one hour or more.
-- **One timer per slide.** Each slide stores its own duration and sound setting.
-- **Gets out of your way.** The macro only runs while the countdown is running. Pause it, or let it finish, and Esc and slide navigation work normally again. Play resumes where you paused.
-- **Offline and self-contained:** no telemetry, network calls, AppleScript or third-party code.
+- Native seven-segment PowerPoint shapes; no special fonts needed.
+- Choose and preview an end sound during creation, including a No sound option. Each timer saves its own choice.
+- Existing play/pause, SET presets, +/− one minute, reset and sound controls.
+- Independent deadlines and pause states for different timer slides.
+- Short updates scheduled on the macOS main run loop, so a countdown does not hold a macro open and block navigation.
+- End sound follows **System Settings > Sound > Output** and media volume, including an external display, Bluetooth device or audio interface selected there.
+- Durations from 1 second to 23:59:59, with an hours field when needed.
+- Offline: no network, AppleScript, ActiveX, add-in or third-party runtime.
 
 ## Requirements
 
-- Desktop **PowerPoint for Mac** (Microsoft 365 / Office 2019 or later, 64-bit, VBA7)
-- Presentation saved as a **macro-enabled presentation (`.pptm`)**
-- Macros allowed for that presentation. Some organization policies block them.
+- Desktop **PowerPoint for Mac**, Microsoft 365 / Office 2019 or later, 64-bit, VBA7.
+- Presentation saved as **.pptm**, with macros enabled.
+- Both **SlideTimer** (standard module) and **SlideTimerEvents** (class module) imported into that presentation.
 
-The timer does not run in PowerPoint for Windows, PowerPoint on the web, iPad/iPhone, Keynote, or in exported PDFs or videos. The module uses macOS system libraries.
+PowerPoint for Windows, the web, iPad/iPhone, Keynote, PDFs and exported videos are not supported. The module uses native macOS libraries. PowerPoint's event and animation behavior still needs checking on the Office version you present with; see [TESTING.md](TESTING.md).
 
 ## Setup
 
-1. **Download** [`SlideTimer.bas`](SlideTimer.bas) from this repository.
-2. Open your presentation in PowerPoint for Mac. Choose **File > Save As** and select **PowerPoint Macro-Enabled Presentation (.pptm)**.
-3. Open **Tools > Macro > Visual Basic Editor**. If the project list is hidden, choose **View > Project Explorer**, then select your presentation's project.
-4. Choose **File > Import File…** and pick `SlideTimer.bas`. A module named **SlideTimer** appears. Import it only once per presentation.
-   - If *Import File* is unavailable, choose **Insert > Module** and paste the full contents of [`SlideTimer-Paste.txt`](SlideTimer-Paste.txt). This is the same code without the import-only `Attribute` line.
-5. Back in PowerPoint, select a slide in **Normal** view. Choose **Tools > Macro > Macros…**, run **`Timer_Insert`**, and enter a duration (for example `5` or `1:30`).
-6. Save the file. Start the show (**Slide Show > From Current Slide**) and click the round **play/pause** button.
+1. Download [`SlideTimer.bas`](SlideTimer.bas) and [`SlideTimerEvents.cls`](SlideTimerEvents.cls).
+2. Open your presentation and save it as **PowerPoint Macro-Enabled Presentation (.pptm)**.
+3. Open **Tools > Macro > Visual Basic Editor**. In **View > Project Explorer**, select your presentation's project.
+4. Choose **File > Import File…** for **both** files. Import each only once. You should see the standard module **SlideTimer** and class module **SlideTimerEvents**.
+   - If importing is unavailable, use **Insert > Module** and paste [`SlideTimer-Paste.txt`](SlideTimer-Paste.txt). Then use **Insert > Class Module**, set its **(Name)** in the Properties window to **SlideTimerEvents**, and paste [`SlideTimerEvents-Paste.txt`](SlideTimerEvents-Paste.txt). Do not paste the class into a standard module.
+5. In PowerPoint's **Normal** view, select a slide and run **`Timer_Insert`** from **Tools > Macro > Macros…**. Enter a duration such as `5` or `1:30`, then choose the end sound by number or name. Type `p 2` to preview Glass; enter `2` to keep it. Choose `0` for no sound. Canceling either creation prompt leaves the slide without a new timer.
+6. Save, start the show with PowerPoint’s usual **Slide Show** commands, then click the timer’s **play/pause** button or **digits**.
 
-When PowerPoint asks about macros on opening the file, enable them. Without macros the timer is only a picture.
+Start shows normally, including after reopening the deck. The timer controls initialize their background updates and close-event handling automatically; you do not need to run a setup macro before each show.
 
-**Optional checks before presenting:** run `Timer_RunSelfTests` (expect *30 checks passed*), `Timer_TestSound` (plays the end alert), and a short `0:05` countdown in Slide Show view on your real display setup.
+When upgrading from 1.2.0–1.2.3, run **`Timer_Initialize` once in Normal view** and save. This removes the old hidden click-start shapes and their animation steps from your existing slides.
 
 ## Using the timer
 
-### In Slide Show view
-
 | Control | What it does |
 | --- | --- |
-| **Play/pause** (or click the digits) | Start, pause or resume. Pausing also releases the show for Esc and navigation. After TIME'S UP it starts a new countdown. |
-| **SET** | Step to the next preset: 1, 2, 3, 5, 10, 15, 20, 30, 45, 60 minutes, then back to 1. Resets the timer. |
-| **+** / **−** | Add or subtract one minute. Works while running or paused, with a minimum of 1 second. |
+| **Play/pause** or **digits** | Start, pause or resume. After TIME'S UP, starts a fresh countdown. |
+| **SET** | Next preset: 1, 2, 3, 5, 10, 15, 20, 30, 45, 60 minutes, then 1. Resets to Ready. |
+| **+** / **−** | Add/subtract one minute from the duration and remaining time; minimum 1 second. Works while running or paused. |
 | **RESET** | Restore the configured duration and wait for play. |
-| **SOUND ON / OFF** | Turn the end alert on or off for this timer. |
+| **SOUND ON / OFF** | Enable/mute this timer's end alert. Muting cancels pending repeats. |
 
-**Need to leave mid-countdown?** Press pause, then Esc or the arrow keys as usual.
+Spacebar, arrow keys and presenter remotes keep their ordinary slide-navigation and animation behavior. Use the timer’s own controls to start or resume it. RESET and SET restore Ready state and wait for play; returning to a running, paused or finished timer preserves that state.
 
-At zero the digits turn muted red, the display shows **00:00 / TIME'S UP**, and the alert plays (if sound is on). Clicking reset, play or SOUND OFF during the alert stops the remaining repeats.
+**Navigate, switch apps or press Esc whenever you need to.** A running timer continues, including while the show is closed and the deck is still open. The end alert can therefore play while you are on another slide or in Normal view. Use pause or `Timer_Shutdown` to stop counting.
 
-SET uses presets instead of a text field during the show because PowerPoint for Mac opens dialogs behind the full-screen show, where they cannot receive input. To set an exact duration such as `7:30`, use `Timer_Configure` in Normal view.
+At zero the digits turn muted red and show **00:00 / TIME'S UP**. Reset, restart or SOUND OFF cancels remaining alert repeats. An alert already playing can finish.
 
-### In Normal view
+SET uses presets during the show because PowerPoint for Mac can put input dialogs behind the full-screen show. Use `Timer_Configure` in Normal view for an exact duration.
 
-Run these from **Tools > Macro > Macros…**:
+## Macros in Normal view
 
 | Macro | Purpose |
 | --- | --- |
-| `Timer_Insert` | Add a timer to the current slide (or edit the duration if one exists) |
-| `Timer_Configure` | Type any duration for the current slide's timer |
-| `Timer_Remove` | Delete the current slide's timer |
-| `Timer_RefreshStyle` | Rebuild the timer with the current design, keeping duration, sound, position and width |
-| `Timer_CheckCurrent` | Check that all timer parts are present |
-| `Timer_TestSound` | Play the end alert |
-| `Timer_RunSelfTests` | Check parsing, formatting and the native clock bindings |
-| `Timer_Help` | Show a short help dialog |
+| `Timer_Insert` | Add a timer with duration/sound choices, or configure an existing timer |
+| `Timer_Present` | Optional shortcut to launch the configured show; normal show commands work too |
+| `Timer_Initialize` | Optional one-time upgrade cleanup of obsolete click-start shapes/animations |
+| `Timer_Configure` | Type an exact duration for the current timer |
+| `Timer_ChooseSound` | Choose/preview the current timer’s end sound in Normal view |
+| `Timer_Start` | Start/resume without toggling; useful for a shape's Run macro action |
+| `Timer_Shutdown` | Pause timers, cancel repeats and stop native callbacks before editing VBA |
+| `Timer_Remove` | Remove the current timer |
+| `Timer_RefreshStyle` | Rebuild the current timer, keeping duration, sound, position and width |
+| `Timer_CheckCurrent` | Check parts and report the last background error |
+| `Timer_TestSound` | Play this timer’s selected sound three times through the current media output; muted timers stay silent |
+| `Timer_RunSelfTests` | Run duration, state-transition and clock checks; expect **59 checks passed** |
+| `Timer_Help` | Short usage help |
 
-Duration input accepts:
+Duration input accepts `5` (5 minutes), `1:30` (90 seconds), `0:10` (10 seconds), or `1:02:03` (1 hour, 2 minutes, 3 seconds). Use whole numbers, in the range `0:01`–`23:59:59`.
 
-| Input | Duration |
-| --- | --- |
-| `5` | 5 minutes |
-| `1:30` | 1 minute 30 seconds |
-| `0:10` | 10 seconds |
-| `1:02:03` | 1 hour 2 minutes 3 seconds |
+## Placing and reusing timers
 
-Whole numbers only. The range is `0:01` to `23:59:59`.
+- Move/resize the timer as **one group**; keep its parts and names intact.
+- Duplicate a timer slide, or run `Timer_Insert` on another slide. Each timer has its own duration, sound preference and in-memory countdown state.
+- Import both modules into every deck that uses the timer. Copying shapes does not copy VBA.
+- Set timer-slide transitions to **None**. The timer forces a redraw once per changed second, and a transition could replay.
+- Do not animate the entire timer group to disappear; it must remain visible to operate its controls.
 
-### Placing and reusing timers
+## Sound settings
 
-- Move or resize the timer as **one group** in Normal view. Don't ungroup it or rename its parts.
-- Duplicate a timer slide, or run `Timer_Insert` on another slide. Each slide keeps its own settings.
-- To use the timer in another presentation, import the module there too. Copying the shapes alone does not copy the code.
-- If the slide has a **transition**, set it to **None**. The timer redraws the slide once per second, and a transition would replay each time.
+`Timer_Insert` now asks which sound to use after the duration. The choices are **Ping, Glass, Hero, Submarine, Funk, Basso, Blow, Bottle, Frog, Morse, Pop, Purr, Sosumi and Tink**, plus **0 / None** for a silent timer. Enter a listed number or name. To listen before deciding, enter `p 2` (preview Glass), then enter `2` or `Glass` to save it. Previewing does not save a choice; Cancel keeps an existing timer unchanged or cancels creation of a new timer.
 
-## Customization
+To change a timer later, select its slide in Normal view and run **`Timer_ChooseSound`**. Its sound choice is saved with that timer in the `.pptm`, survives slide duplication and `Timer_RefreshStyle`, and is used by both timer completion and `Timer_TestSound`. Older timers without a choice keep the existing default until you change them. Choosing None mutes the timer; the existing SOUND ON button can re-enable its previous choice (Ping for a newly silent timer).
 
-The settings are constants at the top of `SlideTimer.bas`:
+The end sound uses Apple's built-in **`/usr/bin/afplay`** in a separate process. VBA passes the executable and sound path as a UTF-8 argument vector using `posix_spawn`; no shell, AppleScript or Objective-C sound calls are used. The audio player uses the normal media output and volume, rather than the separate system-alert output. Audio decoding and playback happen outside PowerPoint's process.
+
+Choose the desired device in **System Settings > Sound > Output**, set media volume, and run `Timer_TestSound` on your actual presentation setup. Changing the output after the sound has loaded is supported; each repeat uses the default output again. A failed player launch is reported immediately; a nonzero player exit is recorded for `Timer_CheckCurrent`. Playback failures do not stop other countdowns. There is no fallback to the separate system alert route.
+
+Constants near the top of `SlideTimer.bas`:
 
 | Constant | Default | Meaning |
 | --- | --- | --- |
-| `PT_ALERT_FILE` | `/System/Library/Sounds/Hero.aiff` | Sound played at zero. Any `.aiff`, `.wav` or `.caf` path works. Try `Glass`, `Ping` or `Submarine` from the same folder. |
-| `PT_ALERT_REPEATS` | `3` | How many times the alert plays |
-| `PT_ALERT_GAP` | `1.2` | Seconds between alerts |
+| `PT_ALERT_FILE` | `/System/Library/Sounds/Ping.aiff` | Fallback for older timers without a saved sound choice and tests on a slide with no timer |
+| `PT_ALERT_REPEATS` | `3` | Number of end alerts |
+| `PT_ALERT_GAP` | `1.8` | Minimum seconds between alerts; the next repeat also waits until playback finishes |
 
-The SET presets are in `NextPresetDuration`. If the sound file can't be loaded, the timer falls back to the alert sound selected in **System Settings > Sound**.
+The SET presets are in `NextPresetDuration`. A missing/unplayable sound produces a player error instead of silently playing through a different output. Automatic repeats wait for the current player to finish, so longer choices such as Funk are not cut off. A new manual test or preview replaces current playback. `Timer_Shutdown` terminates and reaps that child. The child inherits PowerPoint’s sandbox; restrictive organization or sandbox policies can block playback, which is reported without restoring the crashing sound bridge.
 
 ## How it works
 
-- The timer is a single PowerPoint group of about 65 shapes. Each digit has seven polygon segments, and each button has an *Action Setting* that runs a public VBA macro.
-- `CACurrentMediaTime` (QuartzCore) provides a monotonic clock. The remaining time is calculated from a deadline, not by counting ticks.
-- A loop with `DoEvents` and a 30 ms `usleep` keeps the controls responsive without spinning the CPU. A guard prevents a second loop from starting.
-- Each second, only the segments that change are updated. PowerPoint for Mac doesn't repaint a running show after changes made from VBA, so the timer re-enters the current slide (`GotoSlide …, msoFalse`) to force a redraw.
-- The end alert loads the sound with `AudioServicesCreateSystemSoundID` and plays it with `AudioServicesPlayAlertSound` (AudioToolbox), because VBA's `Beep` is silent on Mac.
-- Settings are stored as shape tags on the timer. There are no external configuration files.
+- Shape tags store configured duration, sound choice and mute preference. Countdown state lives in memory per timer while its presentation stays open.
+- `CACurrentMediaTime` gives a monotonic deadline. Remaining time is recalculated from that deadline after a delayed update, so app switches and slide navigation do not reset or extend it.
+- A `CFRunLoopTimer` runs a brief update every 100 ms on PowerPoint's main thread. It is registered in common run-loop modes; there is no `DoEvents` countdown loop.
+- The event class handles presentation closing and invalidates native callbacks **before the presentation’s VBA project closes**. It does not handle slide-show clicks. Timer controls attach these close handlers when used.
+- Changed segments are updated each second. A visible timer slide is redrawn with `GotoSlide …, msoFalse`, using the deck's actual slide index; hidden timer updates never navigate back to it. A black/white/paused show is not forced back into its running view.
+- The native callback catches errors and never opens a dialog. `Timer_CheckCurrent` reports a background failure.
 
-## Known limitations
+API references: [Apple run-loop timers](https://developer.apple.com/library/archive/documentation/Cocoa/Conceptual/Multithreading/RunLoopManagement/RunLoopManagement.html), [Apple subprocess lifecycle guidance](https://developer.apple.com/documentation/appkit/managing-ongoing-background-processes-in-your-mac), [PresentationBeforeClose](https://learn.microsoft.com/en-us/office/vba/api/powerpoint.application.presentationbeforeclose).
 
-- Leaving the slide or ending the show while the timer *runs* resets it. The countdown doesn't follow you across slides.
-- A paused or finished timer keeps its display (PAUSED or TIME'S UP), also when you come back to the slide or end the show. Press RESET to return to the configured duration. Because PowerPoint keeps shape changes made during a show, save the file after a reset if you want it to open in the Ready state.
-- While a countdown is running, the VBA loop is active, and PowerPoint may react to keyboard navigation more slowly than usual. Pause first for instant navigation.
-- PowerPoint for Mac offers VBA no way to add keyboard shortcuts inside a slide show, so pause is the way to release the timer.
-- Only one slide show at a time and one timer per slide are supported.
-- Don't let the Mac sleep during a countdown.
+## Lifecycle and limitations
+
+- **Run `Timer_Shutdown` before editing/removing either VBA module, pressing VBE Reset/End, or using breakpoints.** A scheduled native callback points into VBA code, so changing that code while it is scheduled is unsafe. Normal presentation closing uses `PresentationBeforeClose` to stop it automatically.
+- Closing the deck ends its timer session. Reopening or restarting PowerPoint does not restore running deadlines. Saved shape appearances may still show their last display; initialization restores the in-memory Ready state when a timer is first observed.
+- PowerPoint must remain running and responsive. If macOS or a modal operation delays updates, the next update catches up to the deadline; the alert can be delayed until then.
+- Do not let the Mac sleep during a countdown.
+- Use one slide show at a time and one timer per slide. Multiple timers within that deck can count independently.
 
 ## Troubleshooting
 
-**Clicking play does nothing.** Make sure you are in Slide Show view, macros are enabled, and the module is in *this* presentation. With Presenter View, click on the audience display.
+**An old timer slide still consumes an extra click.** Exit the show, run `Timer_Initialize` once in Normal view, then save. This deletes only the old tagged click-start shapes and effects. Start the timer with its play/pause button or digits.
 
-**The digits only change when I click.** You are running an old version of the module. Replace it with the current `SlideTimer.bas`.
+**Play does nothing.** Enable macros in this deck and use Slide Show view. For Presenter View, the direct shape buttons are on the audience display.
 
-**No sound at zero.** Check that the timer shows SOUND ON, run `Timer_TestSound`, and check the alert volume and output device in **System Settings > Sound**.
+**No sound or the wrong output.** Check SOUND ON and the selected **media output and volume**, then run `Timer_TestSound`. The separate alert-output preference is no longer used. If playback fails, run `Timer_CheckCurrent` for the last background error. A spawn error means the player could not launch; an afplay exit status means it launched and could not finish playing. Check that the selected output is connected and permitted by your organization’s policy.
 
-**The macros disappeared.** The file was saved as `.pptx`, which removes VBA. Import the module again and save as `.pptm`.
+**User-defined type not defined at `SlideTimerEvents`.** Import the class module too, or create a Class Module named exactly `SlideTimerEvents` and paste the class-only text file.
 
-**"Missing timer component …" or a control lost its action.** Run `Timer_RefreshStyle` in Normal view to rebuild the timer, or delete it and run `Timer_Insert`. To fix one control by hand, use **Insert > Action > Run macro** with these macros: play/pause and digits use `Timer_Toggle`, RESET uses `Timer_Reset`, SET uses `Timer_Configure`, + uses `Timer_AddMinute`, − uses `Timer_SubtractMinute`, and SOUND uses `Timer_ToggleSound`.
+**Missing timer component or broken control.** Run `Timer_RefreshStyle` in Normal view. Play/pause and digits use `Timer_Toggle`; RESET uses `Timer_Reset`; SET uses `Timer_Configure`; +/− use `Timer_AddMinute` / `Timer_SubtractMinute`; SOUND uses `Timer_ToggleSound`. A custom start-only shape can use `Timer_Start`.
 
-## Updating
+**Macros disappeared.** Saving as `.pptx` strips VBA. Import both modules again and save as `.pptm`.
 
-Exit the slide show. In the Visual Basic Editor, remove the old **SlideTimer** module (**File > Remove SlideTimer**, then *No* to export). Import the new `SlideTimer.bas` and save as `.pptm`. Existing timers on your slides can stay. Run `Timer_RefreshStyle` only if `Timer_CheckCurrent` reports a problem.
+## Updating from 1.1.x
 
-## Browser preview
+1. **If replacing 1.2.0 or 1.2.1 after a sound failure/crash, quit and reopen PowerPoint first, and do not run its old sound test or shutdown macro.** The old shutdown also calls the unsafe sound bridge. For a working newer version, run `Timer_Shutdown` before editing. For 1.1.x, pause the countdown and exit the show.
+2. In the Visual Basic Editor, remove the old **SlideTimer** standard module (decline exporting if you already have a backup). Also remove the old **SlideTimerEvents** class if present; this version removes its slide-show click handlers.
+3. Import both updated files: **SlideTimer.bas** and **SlideTimerEvents.cls**.
+4. Run **`Timer_Initialize`** once in Normal view. It removes obsolete hidden click-start shapes/animations; timer groups, duration/sound settings and user animations stay.
+5. Save as `.pptm`, start the show normally, and click the timer’s play/pause button or digits. Use `Timer_RefreshStyle` only for an old/non-flat or damaged timer.
 
-[`START-HERE.html`](START-HERE.html) is a JavaScript mock-up of the timer that you can open in any browser to try the controls. It is a demonstration only. It uses a synthesized chime and says nothing about PowerPoint compatibility.
+## Verification and browser preview
+
+Run `Timer_RunSelfTests` in PowerPoint (expect 59 checks), `Timer_TestSound`, and the [presentation test matrix](TESTING.md). Validate the sound list without playing anything with `python3 tools/check_native_runtime.py --catalog-only`. The macOS binding smoke check is `python3 tools/check_native_runtime.py`; add `--play` to hear one alert. It checks native APIs and distribution parity, not VBA compilation or PowerPoint behavior.
+
+[`START-HERE.html`](START-HERE.html) is a browser mock-up with a synthesized chime. It demonstrates the controls; it cannot validate PowerPoint event handling, routing or navigation.
 
 ## Changelog
 
-- **1.1.9:** Pausing ends the macro, so Esc and navigation work while paused. Play resumes the remaining time, and +/− adjust it.
-- **1.1.8:** SET steps through presets during the show (the dialog was unreachable). The macro releases the slide show after the finish alert, and the redraw no longer pulls you back after you navigate away.
-- **1.1.7:** The end alert is the macOS Hero sound, played three times.
-- **1.1.6:** The end alert plays through macOS AudioToolbox instead of the silent VBA `Beep`.
-- **1.1.5:** The display redraws every second during the show instead of only on clicks.
-- **1.1.3:** Faster renderer: cached shapes, and only changed segments are updated.
-- **1.1.2:** Flat LCD group layout and `Timer_RefreshStyle` migration.
+- **1.2.4:** Remove remote/next-click start and its animation step. Start with the timer’s own controls, with no setup macro required per show. Optional one-time cleanup removes old start cues; sound choices and background state remain.
+- **1.2.3:** Per-timer sound chooser during creation, preview with `p 2`, No sound option and `Timer_ChooseSound` for existing timers. Save choices in shape tags and use them for completion/tests; let long sounds finish before repeating.
+- **1.2.2:** Remove the crashing Objective-C/VBA sound bridge entirely. Play Ping through a separate afplay process, track exit errors and clean up the owned child.
+- **1.2.1:** Attempted Hero-loader repair; superseded by 1.2.2 after an Objective-C/VBA crash report. Do not use its sound path.
+- **1.2.0:** End sound follows media output; remote/next-click start cue; scheduled updates replace the blocking loop; per-timer state survives navigation, app switches and temporary show exit. Adds the SlideTimerEvents class and shutdown lifecycle.
+- **1.1.9:** Pausing ends the macro; play resumes remaining time.
+- **1.1.8:** In-show SET presets; release the show after the finish alert.
+- **1.1.7:** Hero sound, three repeats.
+- **1.1.6:** AudioToolbox alert instead of VBA Beep.
+- **1.1.5:** Redraw every second.
+- **1.1.3:** Cached renderer.
+- **1.1.2:** Flat LCD layout and style migration.
 
 ## License
 

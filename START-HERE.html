@@ -59,7 +59,7 @@
     <div>
       <div class="eyebrow">POWERPOINT FOR MAC</div>
       <h1>A countdown.<br>On your slide.</h1>
-      <p class="lead">Set the time. Click to start. Pause when you need to. Hear the Hero alert three times when time is up.</p>
+      <p class="lead">Set the time. Click to start. Pause when you need to. Choose an end sound to hear three times when time is up.</p>
       <a class="download" href="SlideTimer.bas" download>Get the VBA module</a>
       <p class="caption">Native slide objects · Works offline · Save your deck as .pptm</p>
     </div>
@@ -86,10 +86,11 @@
     <ol>
       <li>Open your deck in desktop PowerPoint for Mac. <strong>Save As</strong> a <strong>PowerPoint Macro-Enabled Presentation (.pptm)</strong>.</li>
       <li>Choose <strong>Tools → Macro → Visual Basic Editor</strong> from the Mac menu bar. Select your presentation's project.</li>
-      <li>In the editor, choose <strong>File → Import File…</strong> and select <a href="SlideTimer.bas" download>SlideTimer.bas</a>. Import it once. If import is unavailable, choose <strong>Insert → Module</strong> and paste <a href="SlideTimer-Paste.txt">SlideTimer-Paste.txt</a>.</li>
+      <li>In the editor, choose <strong>File → Import File…</strong> and import both <a href="SlideTimer.bas" download>SlideTimer.bas</a> and <a href="SlideTimerEvents.cls" download>SlideTimerEvents.cls</a>, once each. If import is unavailable, use the <a href="README.md">paste instructions</a> for the standard module and class module.</li>
       <li>Return to PowerPoint and select a slide in <strong>Normal</strong> view. Open <strong>Tools → Macro → Macros…</strong>, select <code>Timer_Insert</code> and click <strong>Run</strong>.</li>
-      <li>Enter the duration (for example <code>5</code> or <code>1:30</code>) and save. Choose <strong>Slide Show → From Current Slide</strong>, then click the round <strong>play/pause</strong> button.</li>
+      <li>Enter the duration (for example <code>5</code> or <code>1:30</code>), then choose a sound by number or name. Type <code>p 2</code> to preview Glass, <code>2</code> to choose it, or <code>0</code> for no sound. Save. Start the show normally, then click the timer’s <strong>play/pause</strong> button or <strong>digits</strong>.</li>
     </ol>
+    <p class="note"><strong>Import both modules:</strong> <a href="SlideTimer.bas">SlideTimer.bas</a> and <a href="SlideTimerEvents.cls">SlideTimerEvents.cls</a>. Use PowerPoint’s usual slide-show commands. When upgrading from 1.2.0–1.2.3, run <code>Timer_Initialize</code> once in Normal view to remove old click-start animation steps, then save. Run <code>Timer_Shutdown</code> before editing the VBA code. See <a href="README.md">the full setup instructions</a>.</p>
     <p class="note">Enable macros for the presentation when PowerPoint asks. This is a VBA component you import into each deck, rather than a precompiled add-in. The code and timer stay in the .pptm file.</p>
   </section>
   <section>
@@ -100,15 +101,15 @@
       <div class="example"><code>0:10</code>10 seconds</div>
       <div class="example"><code>1:02:03</code>1 hour, 2 minutes, 3 seconds</div>
     </div>
-    <p class="note"><strong>Click the digits or play/pause</strong> to start, pause or resume. <strong>Reset</strong> restores the duration. <strong>SET</strong> steps through presets (1, 2, 3, 5, 10, 15, 20, 30, 45, 60 min). <strong>+</strong> and <strong>−</strong> adjust by one minute. <strong>Sound</strong> toggles the end alert. In Normal view, move or resize the group and use <code>Timer_Configure</code> to type any duration.</p>
-    <p class="note">One timer per slide. Leaving the slide while it runs resets it. When paused or finished, the macro stops, so Esc and navigation work normally; play resumes where you paused. Duration range: 0:01–23:59:59. Keep the controls grouped, set the slide transition to None, and import the module into every presentation that uses it.</p>
+    <p class="note"><strong>Click the digits or play/pause</strong> to start, pause or resume. <strong>Reset</strong> restores the duration. <strong>SET</strong> steps through presets (1, 2, 3, 5, 10, 15, 20, 30, 45, 60 min). <strong>+</strong> and <strong>−</strong> adjust by one minute. <strong>Sound</strong> toggles the end alert. In Normal view, move or resize the group and use <code>Timer_Configure</code> to type any duration. Run <code>Timer_ChooseSound</code> to change or preview the current timer’s sound later.</p>
+    <p class="note">One timer per slide. Timers keep counting across slides, app switches and a brief exit from the show. Returning preserves running, paused and finished state. Duration range: 0:01–23:59:59. Keep the controls grouped, set the slide transition to None, and import both modules into every presentation that uses it.</p>
   </section>
   <section>
     <h2>Before presenting</h2>
-    <p class="note">Run <code>Timer_RunSelfTests</code> (expect 30 checks passed), then <code>Timer_TestSound</code>, and try a short countdown in your usual presentation setup. The native timer plays the macOS Hero sound three times at your alert volume.</p>
+    <p class="note">Run <code>Timer_RunSelfTests</code> (expect 59 checks passed), then <code>Timer_TestSound</code>, and try a short countdown in your usual presentation setup. The native timer plays the sound chosen for that timer three times through your selected macOS media output and volume.</p>
     <p class="note">The preview above is a separate JavaScript demonstration. It does not verify PowerPoint compatibility. <a href="README.md">Read the full instructions, customization and troubleshooting</a>.</p>
   </section>
-  <footer>Slide Timer 1.1.9 · Editable VBA source included · Desktop PowerPoint for Mac</footer>
+  <footer>Slide Timer 1.2.4 · Editable VBA source included · Desktop PowerPoint for Mac</footer>
 </main>
 <script>
   const MAX = 86399;

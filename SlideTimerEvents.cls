@@ -1,0 +1,25 @@
+VERSION 1.0 CLASS
+BEGIN
+  MultiUse = -1
+END
+Attribute VB_Name = "SlideTimerEvents"
+Attribute VB_GlobalNameSpace = False
+Attribute VB_Creatable = False
+Attribute VB_PredeclaredId = False
+Attribute VB_Exposed = False
+Option Explicit
+
+' Import alongside SlideTimer.bas. Close events safely clean up background work.
+Public WithEvents App As Application
+
+Private Sub App_PresentationBeforeClose(ByVal Pres As Presentation, Cancel As Boolean)
+    ' Invalidate the native callback BEFORE PowerPoint unloads this project.
+    ' If closing is canceled, the countdown state remains paused.
+    On Error Resume Next
+    SlideTimer.Timer_OnBeforeClose Pres
+End Sub
+
+Private Sub App_PresentationClose(ByVal Pres As Presentation)
+    On Error Resume Next
+    SlideTimer.Timer_OnClose Pres
+End Sub

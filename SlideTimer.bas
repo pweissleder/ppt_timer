@@ -1,11 +1,11 @@
 Attribute VB_Name = "SlideTimer"
 Option Explicit
 
-' Slide Timer 1.1.9 | PowerPoint for Mac, VBA7 / 64-bit
-' Import this module into a presentation and save the presentation as .pptm.
-' Run Timer_Insert in Normal view. Click play/pause in Slide Show view.
+' Slide Timer 1.2.4 | PowerPoint for Mac, VBA7 / 64-bit
+' Import SlideTimer.bas AND SlideTimerEvents.cls, then save as .pptm.
+' Run Timer_Insert in Normal view. Start the show normally and click play/pause.
 ' No network, AppleScript, ActiveX, or third-party dependencies at runtime.
-' The only file read is the macOS system sound used for the end alert.
+' End sound: macOS afplay runs in a separate process; no Objective-C bridge.
 
 #If Mac Then
     Private Declare PtrSafe Function PT_MonotonicTime _
@@ -13,50 +13,87 @@ Option Explicit
         Alias "CACurrentMediaTime" () As Double
     Private Declare PtrSafe Function PT_USleep Lib "/usr/lib/libSystem.B.dylib" _
         Alias "usleep" (ByVal microseconds As Long) As Long
-    ' VBA Beep is silent in PowerPoint for Mac, so the end alert loads a
-    ' system sound file and plays it through the macOS sound service.
-    Private Declare PtrSafe Sub PT_PlayAlertSound _
-        Lib "/System/Library/Frameworks/AudioToolbox.framework/AudioToolbox" _
-        Alias "AudioServicesPlayAlertSound" (ByVal soundID As Long)
-    Private Declare PtrSafe Function PT_CreateSystemSoundID _
-        Lib "/System/Library/Frameworks/AudioToolbox.framework/AudioToolbox" _
-        Alias "AudioServicesCreateSystemSoundID" (ByVal fileURL As LongPtr, ByRef soundID As Long) As Long
-    Private Declare PtrSafe Function PT_CFStringCreate _
-        Lib "/System/Library/Frameworks/CoreFoundation.framework/CoreFoundation" _
-        Alias "CFStringCreateWithCString" (ByVal allocator As LongPtr, ByVal text As String, ByVal encoding As Long) As LongPtr
-    Private Declare PtrSafe Function PT_CFURLCreate _
-        Lib "/System/Library/Frameworks/CoreFoundation.framework/CoreFoundation" _
-        Alias "CFURLCreateWithFileSystemPath" (ByVal allocator As LongPtr, ByVal filePath As LongPtr, _
-        ByVal pathStyle As LongPtr, ByVal isDirectory As Byte) As LongPtr
     Private Declare PtrSafe Sub PT_CFRelease _
         Lib "/System/Library/Frameworks/CoreFoundation.framework/CoreFoundation" _
         Alias "CFRelease" (ByVal reference As LongPtr)
+    Private Declare PtrSafe Function PT_CFAbsoluteTime _
+        Lib "/System/Library/Frameworks/CoreFoundation.framework/CoreFoundation" _
+        Alias "CFAbsoluteTimeGetCurrent" () As Double
+    Private Declare PtrSafe Function PT_MainRunLoop _
+        Lib "/System/Library/Frameworks/CoreFoundation.framework/CoreFoundation" _
+        Alias "CFRunLoopGetMain" () As LongPtr
+    Private Declare PtrSafe Function PT_CreateRunLoopTimer _
+        Lib "/System/Library/Frameworks/CoreFoundation.framework/CoreFoundation" _
+        Alias "CFRunLoopTimerCreate" (ByVal allocator As LongPtr, ByVal fireDate As Double, _
+        ByVal interval As Double, ByVal flags As LongPtr, ByVal order As LongPtr, _
+        ByVal callback As LongPtr, ByVal context As LongPtr) As LongPtr
+    Private Declare PtrSafe Sub PT_AddRunLoopTimer _
+        Lib "/System/Library/Frameworks/CoreFoundation.framework/CoreFoundation" _
+        Alias "CFRunLoopAddTimer" (ByVal runLoop As LongPtr, ByVal timer As LongPtr, ByVal mode As LongPtr)
+    Private Declare PtrSafe Sub PT_InvalidateRunLoopTimer _
+        Lib "/System/Library/Frameworks/CoreFoundation.framework/CoreFoundation" _
+        Alias "CFRunLoopTimerInvalidate" (ByVal timer As LongPtr)
+    Private Declare PtrSafe Function PT_FindSymbol Lib "/usr/lib/libSystem.B.dylib" _
+        Alias "dlsym" (ByVal handle As LongPtr, ByVal symbol As String) As LongPtr
+    Private Declare PtrSafe Sub PT_CopyPointer Lib "/usr/lib/libSystem.B.dylib" _
+        Alias "memmove" (ByRef destination As LongPtr, ByVal source As LongPtr, ByVal size As LongPtr)
+    ' Run Apple's audio player asynchronously with a literal argument vector.
+    ' There is no shell and no Objective-C call from VBA.
+    Private Declare PtrSafe Function PT_Spawn Lib "/usr/lib/libSystem.B.dylib" _
+        Alias "posix_spawn" (ByRef processID As Long, ByVal executable As LongPtr, _
+        ByVal fileActions As LongPtr, ByVal attributes As LongPtr, _
+        ByVal arguments As LongPtr, ByVal environment As LongPtr) As Long
+    Private Declare PtrSafe Function PT_WaitPID Lib "/usr/lib/libSystem.B.dylib" _
+        Alias "waitpid" (ByVal processID As Long, ByRef status As Long, ByVal options As Long) As Long
+    Private Declare PtrSafe Function PT_Kill Lib "/usr/lib/libSystem.B.dylib" _
+        Alias "kill" (ByVal processID As Long, ByVal signal As Long) As Long
 #End If
 
 Private Const PT_MARKER As String = "PT_TIMER"
 Private Const PT_SECONDS As String = "PT_SECONDS"
 Private Const PT_SOUND As String = "PT_SOUND"
-Private Const PT_VERSION As String = "1.1.9"
+Private Const PT_ALERT_NAME As String = "PT_ALERT_NAME"
+' Used only to remove obsolete start cues from versions 1.2.0-1.2.3.
+Private Const PT_LEGACY_CLICK As String = "PT_CLICK_START"
+Private Const PT_VERSION As String = "1.2.4"
 Private Const PT_MAX_SECONDS As Long = 86399
-Private Const PT_ALERT_FILE As String = "/System/Library/Sounds/Hero.aiff"
+Private Const PT_ALERT_FILE As String = "/System/Library/Sounds/Ping.aiff"
+Private Const PT_AUDIO_PLAYER As String = "/usr/bin/afplay"
 Private Const PT_ALERT_REPEATS As Long = 3
-Private Const PT_ALERT_GAP As Double = 1.2
+Private Const PT_ALERT_GAP As Double = 1.8
 
-Private mLoopActive As Boolean
-Private mRunning As Boolean
-Private mFinished As Boolean
+Private Type CountdownState
+    Remaining As Double
+    Deadline As Double
+    Status As String
+End Type
+
+Private Type SlideTimerState
+    Timer As Shape
+    TimerSlide As Slide
+    Clock As CountdownState
+    AlertsLeft As Long
+    NextAlert As Double
+    LastPaint As Long
+    LastStatus As String
+    WasVisible As Boolean
+End Type
+
+Private mStates() As SlideTimerState
+Private mStateCount As Long
+Private mOwner As Presentation
+Private mEvents As SlideTimerEvents
 Private mConfiguring As Boolean
-Private mRemaining As Double
-Private mDeadline As Double
-Private mLastPaint As Long
-Private mTimer As Shape
-Private mSlide As Slide
-Private mWindow As SlideShowWindow
-Private mAlertSound As Long
-Private mPausedTimer As Shape
-Private mPausedRemaining As Double
-Private mAlertsLeft As Long
-Private mNextAlert As Double
+Private mTicking As Boolean
+Private mRefreshing As Boolean
+Private mLastProblem As String
+Private mTestAlertsLeft As Long
+Private mTestNextAlert As Double
+Private mTestSoundPath As String
+#If Mac Then
+Private mNativeTimer As LongPtr
+Private mAudioPID As Long
+#End If
 
 ' Renderer cache. Resolve PowerPoint objects once; keep tick updates small.
 Private mPartParent As Shape
@@ -74,7 +111,8 @@ Private mPreviousIconInk As Long
 ' ------------ Commands available in Tools > Macro > Macros ------------
 
 Public Sub Timer_Insert()
-    Dim sld As Slide, timer As Shape, duration As Long
+    Dim sld As Slide, timer As Shape, duration As Long, soundChoice As String
+    If mConfiguring Then Exit Sub
     On Error GoTo Failed
     If SlideShowWindows.Count > 0 Then
         MsgBox "Exit the slide show before inserting a timer.", vbInformation, "Slide Timer"
@@ -85,20 +123,28 @@ Public Sub Timer_Insert()
     Set timer = FindTimer(sld)
     If Not timer Is Nothing Then
         If ReadTag(timer, "PT_LAYOUT") <> "FLAT" Then Timer_RefreshStyle
+        AttachPresentation sld.Parent
         Timer_Configure
         Exit Sub
     End If
-    If Not AskDuration(300, duration) Then Exit Sub
+    mConfiguring = True
+    If Not AskDuration(300, duration) Then GoTo Done
+    If Not AskSound("Ping", soundChoice) Then GoTo Done
     Set timer = CreateTimer(sld, duration)
+    ApplySoundChoice timer, soundChoice
+    AttachPresentation sld.Parent
     timer.Select
+Done:
+    mConfiguring = False
     Exit Sub
 Failed:
+    mConfiguring = False
     ReportError "insert the timer", Err.Description
 End Sub
 
 Public Sub Timer_Configure()
-    Dim timer As Shape, duration As Long, wasRunning As Boolean
-    Dim active As Boolean, accepted As Boolean, problem As String
+    Dim timer As Shape, duration As Long, accepted As Boolean, index As Long
+    Dim wasRunning As Boolean, oldStatus As String, problem As String
     If mConfiguring Then Exit Sub
     On Error GoTo Failed
     Set timer = CurrentTimer()
@@ -106,16 +152,13 @@ Public Sub Timer_Configure()
         MsgBox "This slide has no timer. Run Timer_Insert first.", vbInformation, "Slide Timer"
         Exit Sub
     End If
+    index = StateFor(timer)
     mConfiguring = True
-    active = IsActiveTimer(timer)
-    If active Then
-        CaptureRemaining
-        wasRunning = mRunning
-        mRunning = False
-    End If
+    UpdateState index
+    oldStatus = mStates(index).Clock.Status
+    wasRunning = (oldStatus = "Running")
+    If wasRunning Then mStates(index).Clock.Status = "Paused"
     If SlideShowWindows.Count > 0 Then
-        ' A dialog opened during a slide show sits behind the full-screen
-        ' show and cannot receive input, so SET steps through presets here.
         duration = NextPresetDuration(DurationOf(timer))
         accepted = True
     Else
@@ -123,116 +166,126 @@ Public Sub Timer_Configure()
     End If
     If accepted Then
         timer.Tags.Add PT_SECONDS, CStr(duration)
-        If IsPausedTimer(timer) Then ClearPaused
-        If active Then
-            mRemaining = duration
-            mRunning = False
-            mFinished = False
-        End If
-        PaintTimer timer, duration, "Ready"
-    ElseIf active Then
-        ' Cancel freezes the elapsed time spent in the dialog.
-        mRunning = wasRunning
-        If mRunning Then mDeadline = ClockSeconds() + mRemaining
-        PaintActiveTimer
+        ResetCountdown mStates(index).Clock, duration
+        mStates(index).AlertsLeft = 0
+    ElseIf wasRunning Then
+        StartCountdown mStates(index).Clock, DurationOf(timer), ClockSeconds()
+    Else
+        mStates(index).Clock.Status = oldStatus
     End If
     mConfiguring = False
+    PaintState index
     Exit Sub
 Failed:
     problem = Err.Description
     mConfiguring = False
-    If active Then
-        mRunning = False
-        On Error Resume Next
-        PaintActiveTimer
-        On Error GoTo 0
-    End If
     ReportError "configure the timer", problem
 End Sub
 
+Public Sub Timer_Initialize()
+    ' Optional upgrade cleanup. Timer buttons attach close events themselves;
+    ' no initialization macro is required before an ordinary slide show.
+    On Error GoTo Failed
+    If Presentations.Count = 0 Then Exit Sub
+    If SlideShowWindows.Count > 0 Then
+        MsgBox "Exit the slide show before cleaning up old start animations.", vbInformation, "Slide Timer"
+        Exit Sub
+    End If
+    AttachPresentation ActivePresentation
+    Exit Sub
+Failed:
+    ReportError "initialize the timer", Err.Description
+End Sub
+
+Public Sub Timer_Present()
+    ' Optional convenience command retained for existing users.
+    Dim win As SlideShowWindow
+    On Error GoTo Failed
+    If Presentations.Count = 0 Then Exit Sub
+    AttachPresentation ActivePresentation
+    If SlideShowWindows.Count = 0 Then Set win = mOwner.SlideShowSettings.Run
+    Exit Sub
+Failed:
+    ReportError "start the presentation", Err.Description
+End Sub
+
 Public Sub Timer_Toggle()
-    Dim timer As Shape, win As SlideShowWindow, problem As String
+    Dim timer As Shape, index As Long
     On Error GoTo Failed
     If mConfiguring Then Exit Sub
     If SlideShowWindows.Count = 0 Then
         MsgBox "Start Slide Show view, then click the timer's play/pause button.", vbInformation, "Slide Timer"
         Exit Sub
     End If
-    Set win = SlideShowWindows(1)
-    Set timer = FindTimer(win.View.Slide)
+    Set timer = CurrentTimer()
     If timer Is Nothing Then Exit Sub
     If ReadTag(timer, "PT_LAYOUT") <> "FLAT" Then
         MsgBox "Exit the show and run Timer_RefreshStyle to update this timer.", vbInformation, "Slide Timer"
         Exit Sub
     End If
-
-    ' DoEvents can dispatch another click while RunTimerLoop is running.
-    ' That click only changes state. It never creates a second loop.
-    If mLoopActive Then
-        If Not IsActiveTimer(timer) Then Exit Sub
-        If mRunning Then
-            CaptureRemaining
-            mRunning = False
-        Else
-            If mFinished Or mRemaining <= 0 Then mRemaining = DurationOf(timer)
-            mFinished = False
-            mDeadline = ClockSeconds() + mRemaining
-            mRunning = True
-        End If
-        PaintActiveTimer
-        Exit Sub
+    index = StateFor(timer)
+    UpdateState index
+    If mStates(index).Clock.Status = "Running" Then
+        mStates(index).Clock.Status = "Paused"
+    Else
+        StartCountdown mStates(index).Clock, DurationOf(timer), ClockSeconds()
+        mStates(index).AlertsLeft = 0
     End If
-
-    Set mTimer = timer
-    Set mWindow = win
-    Set mSlide = win.View.Slide
-    mRemaining = DurationOf(timer)
-    If IsPausedTimer(timer) Then mRemaining = mPausedRemaining
-    ClearPaused
-    PaintTimer timer, WholeSeconds(mRemaining), "Ready"
-    mDeadline = ClockSeconds() + mRemaining
-    mFinished = False
-    mRunning = True
-    mLoopActive = True
-    mLastPaint = -1
-    PaintActiveTimer
-    RunTimerLoop
+    StartScheduler
+    PaintState index
     Exit Sub
 Failed:
-    problem = Err.Description
-    StopTimerSession
-    ReportError "run the timer", problem
+    ReportError "run the timer", Err.Description
 End Sub
 
-Public Sub Timer_Reset()
-    Dim timer As Shape
+Public Sub Timer_Start()
+    ' Idempotent action macro: duplicate start requests never pause/restart.
+    Dim timer As Shape, index As Long
     On Error GoTo Failed
     If mConfiguring Then Exit Sub
     Set timer = CurrentTimer()
     If timer Is Nothing Then Exit Sub
-    If IsActiveTimer(timer) Then
-        mRunning = False
-        mFinished = False
-        mRemaining = DurationOf(timer)
-    End If
-    If IsPausedTimer(timer) Then ClearPaused
-    PaintTimer timer, DurationOf(timer), "Ready"
+    index = StateFor(timer)
+    UpdateState index
+    If mStates(index).Clock.Status = "Running" Then Exit Sub
+    StartCountdown mStates(index).Clock, DurationOf(timer), ClockSeconds()
+    mStates(index).AlertsLeft = 0
+    StartScheduler
+    PaintState index
+    Exit Sub
+Failed:
+    ReportError "start the timer", Err.Description
+End Sub
+
+Public Sub Timer_Reset()
+    Dim timer As Shape, index As Long
+    On Error GoTo Failed
+    If mConfiguring Then Exit Sub
+    Set timer = CurrentTimer()
+    If timer Is Nothing Then Exit Sub
+    index = StateFor(timer)
+    ResetCountdown mStates(index).Clock, DurationOf(timer)
+    mStates(index).AlertsLeft = 0
+    PaintState index
     Exit Sub
 Failed:
     ReportError "reset the timer", Err.Description
 End Sub
 
 Public Sub Timer_ToggleSound()
-    Dim timer As Shape
+    Dim timer As Shape, index As Long
     On Error GoTo Failed
     Set timer = CurrentTimer()
     If timer Is Nothing Then Exit Sub
+    index = StateFor(timer)
     If SoundEnabled(timer) Then
         timer.Tags.Add PT_SOUND, "0"
+        mStates(index).AlertsLeft = 0
     Else
         timer.Tags.Add PT_SOUND, "1"
     End If
     PaintSoundButton timer
+    RefreshShowSurface timer
     Exit Sub
 Failed:
     ReportError "change the sound setting", Err.Description
@@ -247,40 +300,22 @@ Public Sub Timer_SubtractMinute()
 End Sub
 
 Private Sub AdjustDuration(ByVal change As Long)
-    Dim timer As Shape, oldDuration As Long, newDuration As Long, actualChange As Long
+    Dim timer As Shape, oldDuration As Long, newDuration As Long, index As Long
     On Error GoTo Failed
     If mConfiguring Then Exit Sub
     Set timer = CurrentTimer()
     If timer Is Nothing Then Exit Sub
+    index = StateFor(timer)
     oldDuration = DurationOf(timer)
     newDuration = oldDuration + change
     If newDuration < 1 Then newDuration = 1
     If newDuration > PT_MAX_SECONDS Then newDuration = PT_MAX_SECONDS
-    actualChange = newDuration - oldDuration
-    If actualChange = 0 Then Exit Sub
-    If IsActiveTimer(timer) Then
-        CaptureRemaining
-        If mFinished Then
-            mRemaining = newDuration
-        Else
-            mRemaining = mRemaining + actualChange
-            If mRemaining < 1 Then mRemaining = 1
-            If mRemaining > PT_MAX_SECONDS Then mRemaining = PT_MAX_SECONDS
-        End If
-        mFinished = False
-        If mRunning Then mDeadline = ClockSeconds() + mRemaining
-        timer.Tags.Add PT_SECONDS, CStr(newDuration)
-        PaintActiveTimer
-    ElseIf IsPausedTimer(timer) Then
-        mPausedRemaining = mPausedRemaining + actualChange
-        If mPausedRemaining < 1 Then mPausedRemaining = 1
-        If mPausedRemaining > PT_MAX_SECONDS Then mPausedRemaining = PT_MAX_SECONDS
-        timer.Tags.Add PT_SECONDS, CStr(newDuration)
-        PaintTimer timer, WholeSeconds(mPausedRemaining), "Paused"
-    Else
-        timer.Tags.Add PT_SECONDS, CStr(newDuration)
-        PaintTimer timer, newDuration, "Ready"
-    End If
+    If newDuration = oldDuration Then Exit Sub
+    UpdateState index
+    AdjustCountdown mStates(index).Clock, newDuration - oldDuration, newDuration, ClockSeconds()
+    mStates(index).AlertsLeft = 0
+    timer.Tags.Add PT_SECONDS, CStr(newDuration)
+    PaintState index
     Exit Sub
 Failed:
     ReportError "adjust the duration", Err.Description
@@ -288,7 +323,7 @@ End Sub
 
 Public Sub Timer_RefreshStyle()
     Dim sld As Slide, oldTimer As Shape, fresh As Shape, duration As Long
-    Dim oldLeft As Single, oldTop As Single, oldWidth As Single, soundWasOn As Boolean
+    Dim oldLeft As Single, oldTop As Single, oldWidth As Single, soundWasOn As Boolean, soundNameTag As String
     On Error GoTo Failed
     If SlideShowWindows.Count > 0 Then
         MsgBox "Exit the slide show before updating the timer's appearance.", vbInformation, "Slide Timer"
@@ -303,6 +338,7 @@ Public Sub Timer_RefreshStyle()
     End If
     duration = DurationOf(oldTimer)
     soundWasOn = SoundEnabled(oldTimer)
+    soundNameTag = ReadTag(oldTimer, PT_ALERT_NAME)
     oldLeft = oldTimer.Left: oldTop = oldTimer.Top: oldWidth = oldTimer.Width
     Set fresh = CreateTimer(sld, duration)
     fresh.LockAspectRatio = msoTrue
@@ -310,8 +346,11 @@ Public Sub Timer_RefreshStyle()
     fresh.Left = oldLeft
     fresh.Top = oldTop
     If Not soundWasOn Then fresh.Tags.Add PT_SOUND, "0"
+    If Len(soundNameTag) > 0 Then fresh.Tags.Add PT_ALERT_NAME, soundNameTag
     PaintTimer fresh, duration, "Ready"
+    ForgetTimer oldTimer
     oldTimer.Delete
+    AttachPresentation sld.Parent
     fresh.Name = "SlideTimer_" & CStr(sld.SlideID)
     fresh.Select
     Exit Sub
@@ -319,158 +358,367 @@ Failed:
     ReportError "update the timer's appearance", Err.Description
 End Sub
 
+Public Sub Timer_ChooseSound()
+    Dim timer As Shape, initialChoice As String, choice As String, index As Long
+    Dim problem As String
+    If mConfiguring Then Exit Sub
+    On Error GoTo Failed
+    If SlideShowWindows.Count > 0 Then
+        MsgBox "Exit the slide show before choosing a sound.", vbInformation, "Slide Timer"
+        Exit Sub
+    End If
+    Set timer = CurrentTimer()
+    If timer Is Nothing Then
+        MsgBox "This slide has no timer. Run Timer_Insert first.", vbInformation, "Slide Timer"
+        Exit Sub
+    End If
+    index = StateFor(timer)
+    initialChoice = SoundNameOf(timer)
+    If Not SoundEnabled(timer) Then initialChoice = "None"
+    mConfiguring = True
+    If AskSound(initialChoice, choice) Then
+        ApplySoundChoice timer, choice
+        mStates(index).AlertsLeft = 0
+        PaintSoundButton timer
+        RefreshShowSurface timer
+    End If
+    mConfiguring = False
+    Exit Sub
+Failed:
+    problem = Err.Description
+    mConfiguring = False
+    ReportError "choose the end sound", problem
+End Sub
+
 Public Sub Timer_TestSound()
-    ' The same alert played at zero: Hero, three times, at the alert volume.
-    Dim i As Long, ignored As Long
-    For i = 1 To PT_ALERT_REPEATS
-#If Mac Then
-        If i > 1 Then ignored = PT_USleep(CLng(PT_ALERT_GAP * 1000000#))
-#End If
-        PlayAlert
-    Next i
+    Dim timer As Shape
+    On Error GoTo Failed
+    If mConfiguring Then Exit Sub
+    If Presentations.Count = 0 Then Exit Sub
+    Set timer = CurrentTimer()
+    If timer Is Nothing Then
+        mTestSoundPath = PT_ALERT_FILE
+    Else
+        If Not SoundEnabled(timer) Then
+            MsgBox "Sound is off for this timer. Turn SOUND ON or run Timer_ChooseSound first.", _
+                vbInformation, "Slide Timer"
+            Exit Sub
+        End If
+        mTestSoundPath = SoundPathOf(timer)
+    End If
+    AttachPresentation ActivePresentation
+    mTestAlertsLeft = 0
+    PlayAlert mTestSoundPath
+    mTestAlertsLeft = PT_ALERT_REPEATS - 1
+    mTestNextAlert = ClockSeconds() + PT_ALERT_GAP
+    StartScheduler
+    Exit Sub
+Failed:
+    ReportError "play the end sound", Err.Description
 End Sub
 
 Public Sub Timer_Remove()
-    Dim timer As Shape
+    Dim timer As Shape, sld As Slide
     On Error GoTo Failed
     If SlideShowWindows.Count > 0 Then
         MsgBox "Exit the slide show before removing a timer.", vbInformation, "Slide Timer"
         Exit Sub
     End If
-    Set timer = CurrentTimer()
-    If Not timer Is Nothing Then timer.Delete
+    Set sld = EditingSlide()
+    If sld Is Nothing Then Exit Sub
+    Set timer = FindTimer(sld)
+    If timer Is Nothing Then Exit Sub
+    ForgetTimer timer
+    RemoveLegacyStartCue sld
+    timer.Delete
     Exit Sub
 Failed:
     ReportError "remove the timer", Err.Description
 End Sub
 
-Public Sub Timer_Help()
-    MsgBox "SLIDE TIMER " & PT_VERSION & vbCrLf & vbCrLf & _
-        "Normal view: run Timer_Insert to add a timer to the current slide." & vbCrLf & _
-        "Set a duration with Timer_Configure." & vbCrLf & vbCrLf & _
-        "Slide Show view:" & vbCrLf & _
-        "Play/pause or countdown: start, pause, or resume." & vbCrLf & _
-        "Reset: restore the duration and wait for play/pause." & vbCrLf & _
-        "SET: next preset (1-60 min). Plus/minus: adjust one minute." & vbCrLf & _
-        "Sound: enable or mute the end alert." & vbCrLf & vbCrLf & _
-        "Pause releases the show: Esc and slide navigation work normally." & vbCrLf & _
-        "Leaving the slide while it runs resets the timer." & vbCrLf & _
-        "Save as .pptm to keep the code. Import this module into each deck.", _
-        vbInformation, "Slide Timer"
-End Sub
-
-' ------------ Timer engine ------------
-
-Private Sub RunTimerLoop()
-    Dim problem As String, nextVisibilityCheck As Double, idle As Boolean
-    On Error GoTo Failed
-    Do While mLoopActive
-        DoEvents
-        If ClockSeconds() >= nextVisibilityCheck Then
-            If Not TimerStillVisible() Then Exit Do
-            nextVisibilityCheck = ClockSeconds() + 0.15
-        End If
-        If Not mConfiguring Then
-            If mRunning Then
-                CaptureRemaining
-                If WholeSeconds(mRemaining) <> mLastPaint Then
-                    PaintActiveTimer
-                End If
-            End If
-        End If
-        If mAlertsLeft > 0 Then ContinueAlert
-        ' A running macro holds up slide navigation and Esc. Whenever the
-        ' countdown is not running (paused, reset or finished) and no alert is
-        ' pending, end the loop and leave the slide to PowerPoint.
-        If Not mRunning And mAlertsLeft = 0 And Not mConfiguring Then
-            idle = True
-            Exit Do
-        End If
-        YieldBriefly
-    Loop
-    If idle Then
-        EndIdleSession
-    Else
-        StopTimerSession
-    End If
-    Exit Sub
-Failed:
-    problem = Err.Description
-    StopTimerSession
-    ReportError "update the timer", problem
-End Sub
-
-Private Sub CaptureRemaining()
-    If mRunning Then
-        mRemaining = mDeadline - ClockSeconds()
-        If mRemaining <= 0 Then
-            mRemaining = 0
-            mRunning = False
-            mFinished = True
-            PaintActiveTimer
-            ' Commit completion before the alert, even if a pause/settings
-            ' click discovers that the deadline has just passed.
-            If SoundEnabled(mTimer) Then StartAlert
-        End If
-    End If
-End Sub
-
-Private Sub StopTimerSession()
-    ' Cleanup also runs on Esc, navigation, or a deleted/closed slide.
-    ' Only visual text changes here. The configured duration stays in tags.
-    mRunning = False
-    mLoopActive = False
-    mFinished = False
-    mAlertsLeft = 0
-    mConfiguring = False
-    ClearPaused
+Public Sub Timer_Shutdown()
+    ' Always call before editing/removing VBA code or pressing VBE Reset.
+    ' PresentationBeforeClose invokes this before the project can unload.
+    Dim i As Long
+    StopScheduler
+    mTestAlertsLeft = 0
     On Error Resume Next
-    If Not mTimer Is Nothing Then PaintTimer mTimer, DurationOf(mTimer), "Ready"
-    Set mTimer = Nothing
-    Set mSlide = Nothing
-    Set mWindow = Nothing
+    For i = 1 To mStateCount
+        PauseCountdown mStates(i).Clock, ClockSeconds()
+        mStates(i).AlertsLeft = 0
+        If Not mStates(i).Timer Is Nothing Then PaintState i
+    Next i
+    StopAudioPlayer
     On Error GoTo 0
 End Sub
 
-Private Sub EndIdleSession()
-    ' Like StopTimerSession, but keep the display as it is. A paused time is
-    ' remembered so the next play/pause click resumes it; after "Time's up"
-    ' or a reset, the next click starts from the configured duration.
-    If Not mFinished And mRemaining > 0 And WholeSeconds(mRemaining) < DurationOf(mTimer) Then
-        Set mPausedTimer = mTimer
-        mPausedRemaining = mRemaining
-    Else
-        ClearPaused
-    End If
-    mRunning = False
-    mLoopActive = False
-    mFinished = False
-    mAlertsLeft = 0
-    Set mTimer = Nothing
-    Set mSlide = Nothing
-    Set mWindow = Nothing
+Public Sub Timer_Help()
+    MsgBox "SLIDE TIMER " & PT_VERSION & vbCrLf & vbCrLf & _
+        "Normal view: Timer_Insert asks for duration and end sound." & vbCrLf & _
+        "Start the slide show normally, then click play/pause or the digits." & vbCrLf & _
+        "Play/pause or digits: start, pause or resume. RESET: ready again." & vbCrLf & _
+        "SET: presets. Plus/minus: one minute. SOUND: end alert on/off." & vbCrLf & vbCrLf & _
+        "Timers keep counting across slides, app switches and Esc." & vbCrLf & _
+        "Timer_ChooseSound changes the sound; type p 2 to preview choice 2." & vbCrLf & _
+        "The alert follows the selected macOS media output and volume." & vbCrLf & _
+        "Run Timer_Shutdown before changing the VBA code." & vbCrLf & _
+        "Save as .pptm; import both SlideTimer and SlideTimerEvents.", vbInformation, "Slide Timer"
 End Sub
 
-Private Function TimerStillVisible() As Boolean
+' ------------ Timer engine: short callbacks, never a blocking macro loop ------------
+
+Private Sub AttachPresentation(ByVal owner As Presentation)
+    If Not mOwner Is Nothing Then
+        If Not (owner Is mOwner) Then
+            Timer_Shutdown
+            Erase mStates
+            mStateCount = 0
+        End If
+    End If
+    Set mOwner = owner
+    If mEvents Is Nothing Then Set mEvents = New SlideTimerEvents
+    Set mEvents.App = Application
+    ' Only change slide objects in editing view. This also removes the extra
+    ' animation step left by earlier versions without touching user effects.
+    If SlideShowWindows.Count = 0 Then RemoveLegacyStartCues owner
+End Sub
+
+Public Sub Timer_OnBeforeClose(ByVal owner As Presentation)
+    If mOwner Is Nothing Then Exit Sub
+    If Not (owner Is mOwner) Then Exit Sub
+    ' Keep paused state if a save prompt or another handler cancels closing.
+    Timer_Shutdown
+End Sub
+
+Public Sub Timer_OnClose(ByVal owner As Presentation)
+    If mOwner Is Nothing Then Exit Sub
+    If Not (owner Is mOwner) Then Exit Sub
+    Timer_Shutdown
+    Erase mStates
+    mStateCount = 0
+    Set mPartParent = Nothing
+    Set mPartCache = Nothing
+    Set mEvents.App = Nothing
+    Set mEvents = Nothing
+    Set mOwner = Nothing
+End Sub
+
+Private Function StateFor(ByVal timer As Shape) As Long
+    Dim i As Long, sld As Slide
+    For i = 1 To mStateCount
+        If Not mStates(i).Timer Is Nothing Then
+            If timer Is mStates(i).Timer Then
+                StateFor = i
+                Exit Function
+            End If
+        End If
+    Next i
+    Set sld = timer.Parent
+    AttachPresentation sld.Parent
+    mStateCount = mStateCount + 1
+    ReDim Preserve mStates(1 To mStateCount)
+    With mStates(mStateCount)
+        Set .Timer = timer
+        Set .TimerSlide = sld
+        ResetCountdown .Clock, DurationOf(timer)
+        .LastPaint = -1
+    End With
+    StateFor = mStateCount
+End Function
+
+Private Sub ForgetTimer(ByVal timer As Shape)
+    Dim i As Long
+    For i = 1 To mStateCount
+        If Not mStates(i).Timer Is Nothing Then
+            If timer Is mStates(i).Timer Then
+                mStates(i).Clock.Status = "Ready"
+                mStates(i).AlertsLeft = 0
+                Set mStates(i).Timer = Nothing
+                Set mStates(i).TimerSlide = Nothing
+            End If
+        End If
+    Next i
+End Sub
+
+Private Sub StartScheduler()
+#If Mac Then
+    Dim mode As LongPtr, symbol As LongPtr
+    If mNativeTimer <> 0 Then Exit Sub
+    On Error GoTo Failed
+    ' Common modes is a sentinel checked by pointer identity. An equal
+    ' CFString created from text does NOT register a timer in common modes.
+    ' RTLD_DEFAULT = -2; dlsym returns the address of the exported pointer.
+    symbol = PT_FindSymbol(-2, "kCFRunLoopCommonModes")
+    If symbol = 0 Then Err.Raise vbObjectError + 2050, , "Cannot find the run-loop mode."
+    PT_CopyPointer mode, symbol, LenB(mode)
+    If mode = 0 Then Err.Raise vbObjectError + 2050, , "Cannot read the run-loop mode."
+    mNativeTimer = PT_CreateRunLoopTimer(0, PT_CFAbsoluteTime() + 0.1, 0.1, 0, 0, AddressOf Timer_NativeTick, 0)
+    If mNativeTimer = 0 Then Err.Raise vbObjectError + 2050, , "Cannot schedule the timer."
+    PT_AddRunLoopTimer PT_MainRunLoop(), mNativeTimer, mode
+    Exit Sub
+Failed:
+    StopScheduler
+    Err.Raise vbObjectError + 2050, "SlideTimer", "Cannot schedule background updates."
+#Else
+    Err.Raise vbObjectError + 2050, "SlideTimer", "Slide Timer requires PowerPoint for Mac."
+#End If
+End Sub
+
+Private Sub StopScheduler()
+#If Mac Then
+    If mNativeTimer = 0 Then Exit Sub
+    PT_InvalidateRunLoopTimer mNativeTimer
+    PT_CFRelease mNativeTimer
+    mNativeTimer = 0
+#End If
+End Sub
+
+Public Sub Timer_NativeTick(ByVal nativeTimer As LongPtr, ByVal context As LongPtr)
+    ' Core Foundation calls on PowerPoint's main UI thread. No DoEvents,
+    ' dialogs or unhandled errors may escape this native callback.
+    Dim i As Long, win As SlideShowWindow, busy As Boolean
+    On Error GoTo Failed
+    If mTicking Or mConfiguring Or mRefreshing Then Exit Sub
+    mTicking = True
+    Set win = OwnerShowWindow()
+    For i = 1 To mStateCount
+        If StateIsLive(i) Then
+            UpdateState i
+            ContinueAlert i
+            PaintStateIfChanged i, win
+            If mStates(i).Clock.Status = "Running" Or mStates(i).AlertsLeft > 0 Then busy = True
+        End If
+    Next i
+    If mTestAlertsLeft > 0 Then
+        busy = True
+        If ClockSeconds() >= mTestNextAlert And Not AudioPlayerRunning() Then
+            If TryPlayAlert(mTestSoundPath) Then
+                mTestAlertsLeft = mTestAlertsLeft - 1
+            Else
+                mTestAlertsLeft = 0
+            End If
+            mTestNextAlert = ClockSeconds() + PT_ALERT_GAP
+        End If
+    End If
+    ' Keep polling until the last newly launched child has exited and been reaped.
+    If AudioPlayerRunning() Then busy = True
+    If Not busy Then StopScheduler
+    mTicking = False
+    Exit Sub
+Failed:
+    mLastProblem = Err.Description
+    ' Stop native callbacks before showing a problem through Timer_CheckCurrent.
+    On Error Resume Next
+    StopScheduler
+    StopAudioPlayer
+    mTicking = False
+End Sub
+
+Private Function StateIsLive(ByVal index As Long) As Boolean
+    Dim sld As Slide, shp As Shape, shapeId As Long
     On Error GoTo Gone
-    If mWindow Is Nothing Then Exit Function
-    If mSlide Is Nothing Then Exit Function
-    If SlideShowWindows.Count = 0 Then Exit Function
-    If mWindow.View.State = ppSlideShowDone Then Exit Function
-    If mWindow.View.Slide.SlideID <> mSlide.SlideID Then Exit Function
-    ' Accessing the live shape also detects deletion or a closed presentation.
-    If ReadTag(mTimer, PT_MARKER) <> "1" Then Exit Function
-    TimerStillVisible = True
+    If mStates(index).Timer Is Nothing Then Exit Function
+    If ReadTag(mStates(index).Timer, PT_MARKER) <> "1" Then GoTo Gone
+    ' Resolve through the owning deck too: a deleted slide may leave a COM wrapper.
+    Set sld = mOwner.Slides.FindBySlideID(mStates(index).TimerSlide.SlideID)
+    shapeId = mStates(index).Timer.Id
+    For Each shp In sld.Shapes
+        If shp.Id = shapeId Then
+            StateIsLive = True
+            Exit Function
+        End If
+    Next shp
+Gone:
+    mStates(index).Clock.Status = "Ready"
+    mStates(index).AlertsLeft = 0
+    Set mStates(index).Timer = Nothing
+    Set mStates(index).TimerSlide = Nothing
+End Function
+
+Private Function OwnerShowWindow() As SlideShowWindow
+    Dim win As SlideShowWindow
+    On Error GoTo Gone
+    If mOwner Is Nothing Then Exit Function
+    For Each win In SlideShowWindows
+        If win.Presentation Is mOwner Then
+            If win.View.State <> ppSlideShowDone Then Set OwnerShowWindow = win
+            Exit Function
+        End If
+    Next win
 Gone:
 End Function
 
+Private Sub UpdateState(ByVal index As Long)
+    If AdvanceCountdown(mStates(index).Clock, ClockSeconds()) Then
+        If SoundEnabled(mStates(index).Timer) Then
+            mStates(index).AlertsLeft = PT_ALERT_REPEATS
+            mStates(index).NextAlert = ClockSeconds()
+        End If
+    End If
+End Sub
+
+Private Sub ContinueAlert(ByVal index As Long)
+    If mStates(index).AlertsLeft <= 0 Then Exit Sub
+    If mStates(index).Clock.Status <> "Time's up" Or Not SoundEnabled(mStates(index).Timer) Then
+        mStates(index).AlertsLeft = 0
+    ElseIf ClockSeconds() >= mStates(index).NextAlert Then
+        ' Let long selected sounds finish before another timer/repeat plays.
+        If AudioPlayerRunning() Then Exit Sub
+        If TryPlayAlert(SoundPathOf(mStates(index).Timer)) Then
+            mStates(index).AlertsLeft = mStates(index).AlertsLeft - 1
+        Else
+            mStates(index).AlertsLeft = 0
+        End If
+        mStates(index).NextAlert = ClockSeconds() + PT_ALERT_GAP
+    End If
+End Sub
+
+' Pure state transitions. Presentation visibility never changes the clock.
+Private Function AdvanceCountdown(ByRef state As CountdownState, ByVal nowSeconds As Double) As Boolean
+    If state.Status <> "Running" Then Exit Function
+    state.Remaining = state.Deadline - nowSeconds
+    If state.Remaining <= 0 Then
+        state.Remaining = 0
+        state.Status = "Time's up"
+        AdvanceCountdown = True
+    End If
+End Function
+
+Private Sub StartCountdown(ByRef state As CountdownState, ByVal duration As Long, ByVal nowSeconds As Double)
+    If state.Status = "Running" Then Exit Sub
+    If state.Status = "Time's up" Or state.Remaining <= 0 Then state.Remaining = duration
+    state.Deadline = nowSeconds + state.Remaining
+    state.Status = "Running"
+End Sub
+
+Private Sub PauseCountdown(ByRef state As CountdownState, ByVal nowSeconds As Double)
+    Dim finishedNow As Boolean
+    finishedNow = AdvanceCountdown(state, nowSeconds)
+    If state.Status = "Running" Then state.Status = "Paused"
+End Sub
+
+Private Sub ResetCountdown(ByRef state As CountdownState, ByVal duration As Long)
+    state.Remaining = duration
+    state.Deadline = 0
+    state.Status = "Ready"
+End Sub
+
+Private Sub AdjustCountdown(ByRef state As CountdownState, ByVal change As Long, _
+                            ByVal duration As Long, ByVal nowSeconds As Double)
+    If state.Status = "Time's up" Or state.Status = "Ready" Then
+        ResetCountdown state, duration
+    Else
+        state.Remaining = state.Remaining + change
+        If state.Remaining < 1 Then state.Remaining = 1
+        If state.Remaining > PT_MAX_SECONDS Then state.Remaining = PT_MAX_SECONDS
+        If state.Status = "Running" Then state.Deadline = nowSeconds + state.Remaining
+    End If
+End Sub
+
 Private Function ClockSeconds() As Double
 #If Mac Then
-    ' Monotonic time avoids the one-second Mac VBA Timer resolution and
-    ' remains independent of changes to the system clock or midnight.
     ClockSeconds = PT_MonotonicTime()
 #Else
-    ' Secondary fallback only. The supported target for this package is Mac.
     ClockSeconds = CDbl(Now) * 86400#
 #End If
 End Function
@@ -478,82 +726,112 @@ End Function
 Private Sub YieldBriefly()
 #If Mac Then
     Dim ignored As Long
-    ' Sleep for 30 ms, then yield through DoEvents on the next iteration.
-    ' This avoids a busy spin while keeping click/keyboard controls responsive.
+    ' Used only by the optional native-clock diagnostic, never the engine.
     ignored = PT_USleep(30000)
 #End If
 End Sub
 
-Private Sub StartAlert()
-    ' Play the first alert now. RunTimerLoop plays the rest, so the controls
-    ' stay responsive between repeats.
-    PlayAlert
-    mAlertsLeft = PT_ALERT_REPEATS - 1
-    mNextAlert = ClockSeconds() + PT_ALERT_GAP
-End Sub
+Private Function TryPlayAlert(ByVal soundPath As String) As Boolean
+    On Error GoTo Failed
+    PlayAlert soundPath
+    TryPlayAlert = True
+    Exit Function
+Failed:
+    ' An unavailable output must not stop this or any other countdown.
+    mLastProblem = "End sound: " & Err.Description
+End Function
 
-Private Sub ContinueAlert()
-    ' Reset, restart or mute during the alert cancels the remaining repeats.
-    If Not mFinished Or Not SoundEnabled(mTimer) Then
-        mAlertsLeft = 0
-    ElseIf ClockSeconds() >= mNextAlert Then
-        PlayAlert
-        mAlertsLeft = mAlertsLeft - 1
-        mNextAlert = ClockSeconds() + PT_ALERT_GAP
+Private Sub PlayAlert(ByVal soundPath As String)
+#If Mac Then
+    Dim executable() As Byte, soundFile() As Byte, arguments(0 To 2) As LongPtr
+    Dim environment(0 To 0) As LongPtr, processID As Long, result As Long
+    ' Keep every byte buffer and argv alive until posix_spawn has copied them.
+    executable = UTF8CString(PT_AUDIO_PLAYER)
+    soundFile = UTF8CString(soundPath)
+    arguments(0) = VarPtr(executable(0))
+    arguments(1) = VarPtr(soundFile(0))
+    arguments(2) = 0
+    ' Start a fresh short alert if a previous one is still playing.
+    StopAudioPlayer
+    result = PT_Spawn(processID, VarPtr(executable(0)), 0, 0, VarPtr(arguments(0)), VarPtr(environment(0)))
+    If result <> 0 Then
+        Err.Raise vbObjectError + 2051, "SlideTimer", _
+            "macOS could not start afplay (error " & CStr(result) & ")."
     End If
-End Sub
-
-Private Sub PlayAlert()
-#If Mac Then
-    ' Played at the alert volume from System Settings > Sound.
-    On Error GoTo Fallback
-    PT_PlayAlertSound AlertSoundID()
-    Exit Sub
-Fallback:
+    mAudioPID = processID
+    ' The child inherits PowerPoint's sandbox. A denied launch/read/playback
+    ' becomes an error, never an attempt to bypass the sandbox or use Beep.
 #End If
-    Beep
 End Sub
 
+Private Function AudioPlayerRunning() As Boolean
 #If Mac Then
-Private Function AlertSoundID() As Long
-    Dim path As LongPtr, url As LongPtr, created As Long
-    If mAlertSound = 0 Then
-        On Error GoTo Done
-        ' &H8000100 = kCFStringEncodingUTF8; 0 = POSIX path style.
-        path = PT_CFStringCreate(0, PT_ALERT_FILE, &H8000100)
-        If path <> 0 Then url = PT_CFURLCreate(0, path, 0, 0)
-        If url <> 0 Then
-            If PT_CreateSystemSoundID(url, created) = 0 Then mAlertSound = created
+    Dim result As Long, status As Long
+    If mAudioPID <= 0 Then Exit Function
+    result = PT_WaitPID(mAudioPID, status, 1) ' WNOHANG: do not wait for audio.
+    If result = 0 Then
+        AudioPlayerRunning = True
+        Exit Function
+    End If
+    mAudioPID = 0
+    If result > 0 And status <> 0 Then
+        mLastProblem = "afplay could not finish playback (status " & CStr(status) & _
+            "). Check the sound file and selected media output."
+    End If
+#End If
+End Function
+
+Private Sub StopAudioPlayer()
+#If Mac Then
+    Dim ignored As Long, status As Long
+    If Not AudioPlayerRunning() Then Exit Sub
+    ' Only signal our own unreaped child; its PID cannot have been reused.
+    ignored = PT_Kill(mAudioPID, 15) ' SIGTERM; afplay uses its default handler.
+    ignored = PT_WaitPID(mAudioPID, status, 0) ' Reap the terminated child.
+    mAudioPID = 0
+#End If
+End Sub
+
+Private Function UTF8CString(ByVal value As String) As Byte()
+    ' Explicit UTF-8, including surrogate pairs. No implicit VBA/native string
+    ' conversion, shell parsing or quoting is involved in launching afplay.
+    Dim bytes() As Byte, i As Long, used As Long, code As Long, low As Long
+    ReDim bytes(0 To Len(value) * 3) ' Includes at least one zero terminator.
+    i = 1
+    Do While i <= Len(value)
+        code = AscW(Mid$(value, i, 1)) And &HFFFF&
+        If code >= &HD800& And code <= &HDBFF& Then
+            If i = Len(value) Then GoTo InvalidText
+            low = AscW(Mid$(value, i + 1, 1)) And &HFFFF&
+            If low < &HDC00& Or low > &HDFFF& Then GoTo InvalidText
+            code = &H10000 + (code - &HD800&) * &H400& + low - &HDC00&
+            i = i + 1
+        ElseIf code >= &HDC00& And code <= &HDFFF& Then
+            GoTo InvalidText
         End If
-Done:
-        If url <> 0 Then PT_CFRelease url
-        If path <> 0 Then PT_CFRelease path
-    End If
-    ' Without the sound file, fall back to the user's chosen alert sound
-    ' (kSystemSoundID_UserPreferredAlert).
-    AlertSoundID = mAlertSound
-    If AlertSoundID = 0 Then AlertSoundID = &H1000
-End Function
-#End If
-
-Private Function IsPausedTimer(ByVal timer As Shape) As Boolean
-    On Error GoTo Different
-    If mPausedTimer Is Nothing Or timer Is Nothing Then Exit Function
-    If timer Is mPausedTimer Then IsPausedTimer = True
-Different:
-End Function
-
-Private Sub ClearPaused()
-    Set mPausedTimer = Nothing
-    mPausedRemaining = 0
-End Sub
-
-Private Function IsActiveTimer(ByVal timer As Shape) As Boolean
-    On Error GoTo Different
-    If Not mLoopActive Then Exit Function
-    If mTimer Is Nothing Or timer Is Nothing Then Exit Function
-    If timer Is mTimer Then IsActiveTimer = True
-Different:
+        If code = 0 Then GoTo InvalidText
+        If code < &H80 Then
+            bytes(used) = code: used = used + 1
+        ElseIf code < &H800 Then
+            bytes(used) = &HC0 Or (code \ &H40): used = used + 1
+            bytes(used) = &H80 Or (code And &H3F): used = used + 1
+        ElseIf code < &H10000 Then
+            bytes(used) = &HE0 Or (code \ &H1000): used = used + 1
+            bytes(used) = &H80 Or ((code \ &H40) And &H3F): used = used + 1
+            bytes(used) = &H80 Or (code And &H3F): used = used + 1
+        Else
+            bytes(used) = &HF0 Or (code \ &H40000): used = used + 1
+            bytes(used) = &H80 Or ((code \ &H1000) And &H3F): used = used + 1
+            bytes(used) = &H80 Or ((code \ &H40) And &H3F): used = used + 1
+            bytes(used) = &H80 Or (code And &H3F): used = used + 1
+        End If
+        i = i + 1
+    Loop
+    ReDim Preserve bytes(0 To used)
+    UTF8CString = bytes
+    Exit Function
+InvalidText:
+    Err.Raise vbObjectError + 2051, "SlideTimer", "Invalid text in the audio player or sound path."
 End Function
 
 ' ------------ Slide objects and controls ------------
@@ -699,6 +977,26 @@ Failed:
     On Error GoTo 0
     Err.Raise errorNumber, "SlideTimer.CreateTimer", "While " & stage & ": " & problem
 End Function
+
+Private Sub RemoveLegacyStartCues(ByVal owner As Presentation)
+    Dim sld As Slide
+    For Each sld In owner.Slides
+        RemoveLegacyStartCue sld
+    Next sld
+End Sub
+
+Private Sub RemoveLegacyStartCue(ByVal sld As Slide)
+    ' Migration only: remove our old tagged start effect/shape, leaving
+    ' ordinary slide content and its animation sequence in place.
+    Dim i As Long, effect As Effect
+    For i = sld.TimeLine.MainSequence.Count To 1 Step -1
+        Set effect = sld.TimeLine.MainSequence(i)
+        If ReadTag(effect.Shape, PT_LEGACY_CLICK) = "1" Then effect.Delete
+    Next i
+    For i = sld.Shapes.Count To 1 Step -1
+        If ReadTag(sld.Shapes(i), PT_LEGACY_CLICK) = "1" Then sld.Shapes(i).Delete
+    Next i
+End Sub
 
 Private Function ReadTag(ByVal owner As Object, ByVal tagName As String) As String
     ' Missing tags are normal on slide placeholders and user content.
@@ -1133,22 +1431,38 @@ Private Sub SetClick(ByVal shp As Shape, ByVal macroName As String)
     End With
 End Sub
 
-Private Sub PaintActiveTimer()
-    Dim status As String
-    If mFinished Then
-        status = "Time's up"
-    ElseIf mRunning Then
-        status = "Running"
-    ElseIf mRemaining = DurationOf(mTimer) Then
-        status = "Ready"
-    Else
-        status = "Paused"
-    End If
-    PaintTimer mTimer, WholeSeconds(mRemaining), status
+Private Sub PaintState(ByVal index As Long)
+    With mStates(index)
+        PaintTimer .Timer, WholeSeconds(.Clock.Remaining), .Clock.Status
+        .LastPaint = WholeSeconds(.Clock.Remaining)
+        .LastStatus = .Clock.Status
+    End With
 End Sub
+
+Private Sub PaintStateIfChanged(ByVal index As Long, ByVal win As SlideShowWindow)
+    Dim visible As Boolean
+    visible = TimerIsVisible(index, win)
+    With mStates(index)
+        If WholeSeconds(.Clock.Remaining) <> .LastPaint Or .Clock.Status <> .LastStatus Or _
+            (visible And Not .WasVisible) Then PaintState index
+        .WasVisible = visible
+    End With
+End Sub
+
+Private Function TimerIsVisible(ByVal index As Long, ByVal win As SlideShowWindow) As Boolean
+    On Error GoTo Unavailable
+    If win Is Nothing Then Exit Function
+    TimerIsVisible = (win.View.Slide.SlideID = mStates(index).TimerSlide.SlideID)
+Unavailable:
+End Function
 
 Private Sub PaintTimer(ByVal timer As Shape, ByVal seconds As Long, ByVal status As String)
     Dim ink As Long, iconColor As Long, units As String
+    If mPartParent Is Nothing Then
+        BuildPartCache timer
+    ElseIf Not (timer Is mPartParent) Then
+        BuildPartCache timer
+    End If
     ink = RGB(39, 56, 68)
     If status = "Time's up" Then ink = RGB(115, 60, 59)
     PaintLCD timer, FormatDuration(seconds, DurationOf(timer) >= 3600), ink
@@ -1173,28 +1487,30 @@ Private Sub PaintTimer(ByVal timer As Shape, ByVal seconds As Long, ByVal status
         mPreviousIconInk = iconColor
     End If
     Part(timer, "PT_Display").AlternativeText = FormatDuration(seconds) & ". " & status
-    If IsActiveTimer(timer) Then
-        mLastPaint = seconds
-        RefreshShowSurface timer
-    End If
+    RefreshShowSurface timer
 End Sub
 
 Private Sub RefreshShowSurface(ByVal timer As Shape)
-    ' PowerPoint for Mac does not repaint a running slide show after shape
-    ' changes made from VBA; the LCD would only update on the next click.
-    ' Re-entering the current slide without resetting it forces a redraw.
-    Dim position As Long
-    On Error Resume Next
-    If mWindow Is Nothing Or mSlide Is Nothing Then Exit Sub
-    ' Never pull the show back if the presenter has just moved on.
-    If mWindow.View.Slide.SlideID <> mSlide.SlideID Then Exit Sub
-    position = mWindow.View.CurrentShowPosition
-    If position > 0 Then mWindow.View.GotoSlide position, msoFalse
+    ' Redraw only this timer's visible slide. SlideIndex is the deck index;
+    ' CurrentShowPosition would jump to the wrong slide in a custom show.
+    Dim win As SlideShowWindow, sld As Slide
+    On Error GoTo Done
+    If mRefreshing Then Exit Sub
+    Set win = OwnerShowWindow()
+    If win Is Nothing Then Exit Sub
+    Set sld = timer.Parent
+    If win.View.Slide.SlideID <> sld.SlideID Then Exit Sub
+    If win.View.State <> ppSlideShowRunning Then Exit Sub
+    mRefreshing = True
+    win.View.GotoSlide sld.SlideIndex, msoFalse
+Done:
+    mRefreshing = False
 End Sub
 
 Private Sub PaintSoundButton(ByVal timer As Shape)
     Dim label As String, control As Shape
     Set control = Part(timer, "PT_Sound")
+    control.AlternativeText = "End sound: " & SoundNameOf(timer) & ". Click to mute or enable. Use Timer_ChooseSound to change it."
     label = "SOUND OFF"
     If SoundEnabled(timer) Then label = "SOUND ON"
     If mPreviousSound <> label Then
@@ -1250,6 +1566,126 @@ End Function
 
 Private Function SoundEnabled(ByVal timer As Shape) As Boolean
     SoundEnabled = (ReadTag(timer, PT_SOUND) <> "0")
+End Function
+
+
+' ------------ Per-timer end sound selection ------------
+
+Private Function SoundNames() As Variant
+    ' Canonical filenames matter: PowerPoint uppercases tag values.
+    SoundNames = Array("Ping", "Glass", "Hero", "Submarine", "Funk", "Basso", _
+        "Blow", "Bottle", "Frog", "Morse", "Pop", "Purr", "Sosumi", "Tink")
+End Function
+
+Private Function TryParseSoundChoice(ByVal text As String, ByRef choice As String) As Boolean
+    Dim names As Variant, i As Long, number As Long
+    text = Trim$(text)
+    choice = ""
+    If text = "0" Or StrComp(text, "None", vbTextCompare) = 0 Or _
+        StrComp(text, "Off", vbTextCompare) = 0 Then
+        choice = "None"
+        TryParseSoundChoice = True
+        Exit Function
+    End If
+    names = SoundNames()
+    If Len(text) > 0 And Len(text) <= 2 Then
+        If AllDigits(text) Then
+            number = CLng(text)
+            If number >= 1 And number <= UBound(names) + 1 Then
+                choice = CStr(names(number - 1))
+                TryParseSoundChoice = True
+                Exit Function
+            End If
+        End If
+    End If
+    For i = 0 To UBound(names)
+        If StrComp(text, CStr(names(i)), vbTextCompare) = 0 Then
+            choice = CStr(names(i))
+            TryParseSoundChoice = True
+            Exit Function
+        End If
+    Next i
+End Function
+
+Private Function SoundFileForChoice(ByVal choice As String) As String
+    Dim canonical As String
+    If Not TryParseSoundChoice(choice, canonical) Then
+        SoundFileForChoice = PT_ALERT_FILE
+    ElseIf canonical <> "None" Then
+        SoundFileForChoice = "/System/Library/Sounds/" & canonical & ".aiff"
+    End If
+End Function
+
+Private Function SoundNameOf(ByVal timer As Shape) As String
+    Dim canonical As String
+    SoundNameOf = "Ping"
+    If TryParseSoundChoice(ReadTag(timer, PT_ALERT_NAME), canonical) Then
+        If canonical <> "None" Then SoundNameOf = canonical
+    End If
+End Function
+
+Private Function SoundPathOf(ByVal timer As Shape) As String
+    SoundPathOf = SoundFileForChoice(ReadTag(timer, PT_ALERT_NAME))
+End Function
+
+Private Sub ApplySoundChoice(ByVal timer As Shape, ByVal choice As String)
+    Dim canonical As String
+    If Not TryParseSoundChoice(choice, canonical) Then
+        Err.Raise vbObjectError + 2054, "SlideTimer", "Choose a sound from the list."
+    End If
+    If canonical = "None" Then
+        ' Retain the previous selection so the existing SOUND ON button can
+        ' enable it again. A newly muted timer falls back to Ping.
+        timer.Tags.Add PT_SOUND, "0"
+    Else
+        timer.Tags.Add PT_ALERT_NAME, canonical
+        timer.Tags.Add PT_SOUND, "1"
+    End If
+    PaintSoundButton timer
+End Sub
+
+Private Function AskSound(ByVal initialChoice As String, ByRef choice As String) As Boolean
+    Dim names As Variant, prompt As String, answer As String, candidate As String
+    Dim i As Long, preview As Boolean, problem As String
+    On Error GoTo Failed
+    names = SoundNames()
+    prompt = "Choose the end sound by number or name:" & vbCrLf & "0: No sound"
+    For i = 0 To UBound(names)
+        prompt = prompt & vbCrLf & CStr(i + 1) & ": " & CStr(names(i))
+    Next i
+    prompt = prompt & vbCrLf & vbCrLf & "Preview: type p 2, then press OK. Choose 2 to keep it." & _
+        vbCrLf & "Cancel leaves this choice unchanged (or cancels a new timer)."
+    mTestAlertsLeft = 0
+    Do
+        answer = Trim$(InputBox(prompt, "Slide Timer - end sound", initialChoice))
+        If Len(answer) = 0 Then
+            StopAudioPlayer
+            Exit Function
+        End If
+        preview = (StrComp(Left$(answer, 2), "p ", vbTextCompare) = 0)
+        candidate = answer
+        If preview Then candidate = Trim$(Mid$(answer, 3))
+        If TryParseSoundChoice(candidate, choice) Then
+            If preview Then
+                StopAudioPlayer
+                If choice <> "None" Then PlayAlert SoundFileForChoice(choice)
+                initialChoice = choice
+            Else
+                StopAudioPlayer
+                AskSound = True
+                Exit Function
+            End If
+        Else
+            MsgBox "Choose 0-14, a listed sound name, or p followed by a choice to preview.", _
+                vbExclamation, "Slide Timer"
+        End If
+    Loop
+Failed:
+    problem = Err.Description
+    On Error Resume Next
+    StopAudioPlayer
+    On Error GoTo 0
+    Err.Raise vbObjectError + 2054, "SlideTimer", problem
 End Function
 
 ' ------------ Duration input and formatting ------------
@@ -1355,7 +1791,13 @@ Public Sub Timer_CheckCurrent()
         Exit Sub
     End If
     ValidateTimer timer
-    PaintTimer timer, DurationOf(timer), "Ready"
+    If Len(mLastProblem) > 0 Then
+        MsgBox "Last background problem: " & mLastProblem & vbCrLf & _
+            "Fix the problem, then use the timer controls or run Timer_TestSound.", vbExclamation, "Slide Timer"
+        mLastProblem = ""
+        Exit Sub
+    End If
+    PaintState StateFor(timer)
     MsgBox "Slide Timer " & PT_VERSION & ": the flat LCD layout, all 42 segments and round controls passed." & _
         vbCrLf & "Test a 0:05 countdown in Slide Show view next.", vbInformation, "Slide Timer"
     Exit Sub
@@ -1364,7 +1806,7 @@ Failed:
 End Sub
 
 Public Sub Timer_RunSelfTests()
-    Dim total As Long, count As Long, first As Double
+    Dim total As Long, count As Long, first As Double, state As CountdownState, finishedNow As Boolean, encoded() As Byte, soundChoice As String
     On Error GoTo Failed
     AssertValue TryParseDuration("5", total) And total = 300, "minutes", count
     AssertValue TryParseDuration("1:30", total) And total = 90, "mm:ss", count
@@ -1395,6 +1837,57 @@ Public Sub Timer_RunSelfTests()
     AssertValue WholeSeconds(1.01) = 2, "ceiling above one", count
     AssertValue WholeSeconds(1#) = 1, "ceiling exact", count
     AssertValue WholeSeconds(-1#) = 0, "clamp negative", count
+    ResetCountdown state, 300
+    StartCountdown state, 300, 1000
+    finishedNow = AdvanceCountdown(state, 1012.5)
+    AssertValue Not finishedNow And state.Remaining = 287.5, "elapsed off-slide", count
+    StartCountdown state, 300, 1015
+    AssertValue state.Deadline = 1300, "duplicate start keeps deadline", count
+    PauseCountdown state, 1020.25
+    AssertValue state.Status = "Paused" And state.Remaining = 279.75, "fractional pause", count
+    finishedNow = AdvanceCountdown(state, 1100)
+    AssertValue state.Remaining = 279.75, "paused time stays frozen", count
+    StartCountdown state, 300, 1100
+    AssertValue state.Deadline = 1379.75, "resume from remaining", count
+    finishedNow = AdvanceCountdown(state, 1400)
+    AssertValue finishedNow And state.Status = "Time's up" And state.Remaining = 0, "finish while away", count
+    AssertValue Not AdvanceCountdown(state, 1500), "completion happens once", count
+    StartCountdown state, 300, 1500
+    AssertValue state.Deadline = 1800, "restart finished timer", count
+    ResetCountdown state, 60
+    StartCountdown state, 60, 2000
+    PauseCountdown state, 2000.01
+    AssertValue state.Status = "Paused" And state.Remaining > 59, "pause before first paint", count
+    AdjustCountdown state, 60, 120, 2001
+    AssertValue state.Status = "Paused" And state.Remaining > 119, "adjust paused timer", count
+    ResetCountdown state, 60
+    StartCountdown state, 60, 2100
+    finishedNow = AdvanceCountdown(state, 2110)
+    AdjustCountdown state, -60, 1, 2110
+    AssertValue state.Remaining = 1 And state.Deadline = 2111, "running adjustment clamps", count
+    ResetCountdown state, 300
+    AssertValue state.Status = "Ready" And state.Remaining = 300, "explicit reset", count
+    encoded = UTF8CString("Ping")
+    AssertValue UBound(encoded) = 4 And encoded(0) = 80 And encoded(4) = 0, "ASCII argument terminator", count
+    encoded = UTF8CString(ChrW(&HE9))
+    AssertValue UBound(encoded) = 2 And encoded(0) = &HC3 And encoded(1) = &HA9 And encoded(2) = 0, "UTF-8 filename", count
+    encoded = UTF8CString(ChrW(&HD83D) & ChrW(&HDD14))
+    AssertValue UBound(encoded) = 4 And encoded(0) = &HF0 And encoded(1) = &H9F And _
+        encoded(2) = &H94 And encoded(3) = &H94 And encoded(4) = 0, "UTF-8 surrogate pair", count
+    AssertValue TryParseSoundChoice("1", soundChoice) And soundChoice = "Ping", "sound number", count
+    AssertValue TryParseSoundChoice("3", soundChoice) And soundChoice = "Hero", "Hero selection", count
+    AssertValue TryParseSoundChoice("14", soundChoice) And soundChoice = "Tink", "last sound", count
+    AssertValue TryParseSoundChoice(" gLaSs ", soundChoice) And soundChoice = "Glass", "canonical sound name", count
+    AssertValue TryParseSoundChoice("0", soundChoice) And soundChoice = "None", "no sound", count
+    AssertValue TryParseSoundChoice("OFF", soundChoice) And soundChoice = "None", "mute alias", count
+    AssertValue Not TryParseSoundChoice("-1", soundChoice), "reject negative sound", count
+    AssertValue Not TryParseSoundChoice("15", soundChoice), "reject unknown sound number", count
+    AssertValue Not TryParseSoundChoice("1.5", soundChoice), "reject fractional sound", count
+    AssertValue Not TryParseSoundChoice("999999999999", soundChoice), "reject sound overflow", count
+    AssertValue Not TryParseSoundChoice("../Hero", soundChoice), "reject unlisted sound path", count
+    AssertValue SoundFileForChoice("HERO") = "/System/Library/Sounds/Hero.aiff", "uppercase tag filename", count
+    AssertValue SoundFileForChoice("None") = "", "muted sound path", count
+    AssertValue SoundFileForChoice("") = PT_ALERT_FILE, "legacy sound fallback", count
     first = ClockSeconds()
     YieldBriefly
     AssertValue ClockSeconds() > first, "native clock and sleep", count
