@@ -10,7 +10,9 @@ Put a countdown directly on your slide. Click its play/pause button to start, ch
 
 Follow the [setup walkthrough with real PowerPoint screenshots](docs/SETUP.md) if you prefer to see each click.
 
-**[Download the setup ZIP](downloads/SlideTimer-Mac.zip?raw=true)**, extract it, and open **START-HERE.html** for the setup guide and an interactive preview.
+**[Download the setup ZIP](https://raw.githubusercontent.com/pweissleder/ppt_timer/main/downloads/SlideTimer-Mac.zip)**, extract it, and open **START-HERE.html** for the setup guide and an interactive preview.
+
+If the download does not start, [open the ZIP on GitHub](https://github.com/pweissleder/ppt_timer/blob/main/downloads/SlideTimer-Mac.zip) and use its download button.
 
 Prefer to follow the steps here?
 

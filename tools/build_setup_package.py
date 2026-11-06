@@ -11,7 +11,7 @@ from pathlib import Path
 ROOT = Path(__file__).resolve().parents[1]
 OUTPUT = ROOT / "downloads/SlideTimer-Mac.zip"
 PACKAGE_ROOT = "SlideTimer-Mac"
-DOWNLOAD_URL = "https://github.com/pweissleder/ppt_timer/raw/refs/heads/main/downloads/SlideTimer-Mac.zip"
+DOWNLOAD_URL = "https://raw.githubusercontent.com/pweissleder/ppt_timer/main/downloads/SlideTimer-Mac.zip"
 FILES = (
     "README.md",
     "START-HERE.html",

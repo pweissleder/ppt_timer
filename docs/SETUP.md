@@ -8,7 +8,9 @@ You need desktop PowerPoint on a Mac. This version does not run in PowerPoint fo
 
 ## 1. Get the files
 
-[Download the setup ZIP](../downloads/SlideTimer-Mac.zip?raw=true) and double-click it to extract the folder. Open **START-HERE.html** if you want the illustrated timer preview beside the instructions.
+[Download the setup ZIP](https://raw.githubusercontent.com/pweissleder/ppt_timer/main/downloads/SlideTimer-Mac.zip) and double-click it to extract the folder. Open **START-HERE.html** if you want the illustrated timer preview beside the instructions.
+
+If the download does not start, [open the ZIP on GitHub](https://github.com/pweissleder/ppt_timer/blob/main/downloads/SlideTimer-Mac.zip) and use its download button.
 
 Inside the **powerpoint** folder you will find two files. You need both:
 

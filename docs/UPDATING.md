@@ -6,7 +6,7 @@ You can keep your existing timer groups on the slides. Replace **both code files
 
 ## Before you begin
 
-Save a backup of your presentation and download/extract the [current setup ZIP](../downloads/SlideTimer-Mac.zip?raw=true).
+Save a backup of your presentation and download/extract the [current setup ZIP](https://raw.githubusercontent.com/pweissleder/ppt_timer/main/downloads/SlideTimer-Mac.zip). If needed, use the [GitHub file page](https://github.com/pweissleder/ppt_timer/blob/main/downloads/SlideTimer-Mac.zip) and its download button.
 
 - **Using 1.2.2 or later:** run **Timer_Shutdown**, then exit the show before changing the code.
 - **Using 1.2.0 or 1.2.1 after a sound failure/crash:** quit and reopen PowerPoint first. Do not run the old sound test or shutdown macro; they use the old sound bridge.
